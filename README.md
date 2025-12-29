@@ -4,7 +4,7 @@
 
 [![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.org/projects/jdk/17/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.6-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Archbase](https://img.shields.io/badge/Archbase-2.0.0-blue.svg)](https://github.com/archbase/archbase-app-framework)
+[![Archbase](https://img.shields.io/badge/Archbase-2.0.0-blue.svg)](https://github.com/edsonmartins/archbase-app-framework)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -13,7 +13,7 @@
 
 - **[Spring Boot 3.5.6](https://spring.io/projects/spring-boot)** - Framework web com suporte a Jakarta EE
 - **[Java 17](https://openjdk.org/projects/jdk/17/)** - LTS com suporte extendido
-- **[Archbase Framework 2.0.0](https://github.com/archbase/archbase-app-framework)** - Framework DDD brasileiro completo
+- **[Archbase Framework 2.0.0](https://github.com/edsonmartins/archbase-app-framework)** - Framework DDD brasileiro completo
 - **[QueryDSL 5.1.0](https://querydsl.com/)** - Queries tipo-safe com JPA
 - **Arquitetura Hexagonal** - Ports e Adapters (limpa e testável)
 - **Multi-tenancy** - Suporte nativo a múltiplos tenants
@@ -368,7 +368,7 @@ SOFTWARE.
 
 ## Agradecimentos
 
-- [Archbase App Framework](https://github.com/archbase/archbase-app-framework) - Framework DDD para Java
+- [Archbase App Framework](https://github.com/edsonmartins/archbase-app-framework) - Framework DDD para Java
 - [Spring Boot](https://spring.io/projects/spring-boot) - Framework Spring
 - [QueryDSL](https://querydsl.com/) - Queries tipo-safe para Java
 - [MapStruct](https://mapstruct.org/) - Mapeamento de objetos Java
