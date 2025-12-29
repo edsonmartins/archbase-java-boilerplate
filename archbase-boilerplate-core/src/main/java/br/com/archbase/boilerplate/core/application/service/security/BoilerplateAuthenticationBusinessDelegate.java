@@ -3,6 +3,7 @@ package br.com.archbase.boilerplate.core.application.service.security;
 import br.com.archbase.security.auth.AuthenticationBusinessDelegate;
 import br.com.archbase.security.auth.AuthenticationResponse;
 import br.com.archbase.security.domain.entity.User;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -17,10 +18,19 @@ import java.util.Map;
  * Este componente conecta a infraestrutura de autenticação do Archbase
  * com a lógica de negócio do boilerplate.
  * </p>
+ * <p>
+ * Contextos suportados:
+ * - WEB_ADMIN: Interface administrativa web
+ * - MOBILE_APP: Aplicativo móvel
+ * - API: Integrações via API
+ * </p>
  */
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class BoilerplateAuthenticationBusinessDelegate implements AuthenticationBusinessDelegate {
+
+    private final BoilerplateAuthenticationEnricher enricher;
 
     private static final List<String> SUPPORTED_CONTEXTS = Arrays.asList(
             "WEB_ADMIN", "MOBILE_APP", "API"
@@ -45,8 +55,7 @@ public class BoilerplateAuthenticationBusinessDelegate implements Authentication
             HttpServletRequest request) {
         try {
             log.debug("Enriquecendo resposta de autenticação para contexto: {}", context);
-            // Retornar a resposta base sem modificações
-            return baseResponse;
+            return enricher.enrich(baseResponse, context, request);
         } catch (Exception e) {
             log.error("Erro ao enriquecer resposta de autenticação para contexto: {}", context, e);
             return baseResponse;

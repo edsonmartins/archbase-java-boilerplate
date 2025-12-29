@@ -52,10 +52,20 @@ public class ProdutoEntity extends TenantPersistenceEntityBase {
     @Column(name = "data_cadastro")
     private LocalDateTime dataCadastro;
 
+    @Column(name = "destaque")
+    private Boolean destaque;
+
+    @Column(name = "url_imagem", length = 500)
+    private String urlImagem;
+
+    @Column(name = "marca", length = 100)
+    private String marca;
+
     public ProdutoEntity() {
         super();
         this.ativo = true;
         this.estoque = 0;
+        this.destaque = false;
     }
 
     @Builder
@@ -63,7 +73,8 @@ public class ProdutoEntity extends TenantPersistenceEntityBase {
                          String createdByUser, LocalDateTime updateEntityDate,
                          String lastModifiedByUser, String tenantId,
                          String nome, String descricao, BigDecimal preco, Integer estoque,
-                         CategoriaProduto categoria, Boolean ativo, String sku, LocalDateTime dataCadastro) {
+                         CategoriaProduto categoria, Boolean ativo, String sku, LocalDateTime dataCadastro,
+                         Boolean destaque, String urlImagem, String marca) {
         super(id, code, version, createEntityDate, createdByUser, updateEntityDate, lastModifiedByUser, tenantId);
         this.nome = nome;
         this.descricao = descricao;
@@ -73,6 +84,9 @@ public class ProdutoEntity extends TenantPersistenceEntityBase {
         this.ativo = ativo != null ? ativo : true;
         this.sku = sku;
         this.dataCadastro = dataCadastro;
+        this.destaque = destaque != null ? destaque : false;
+        this.urlImagem = urlImagem;
+        this.marca = marca;
     }
 
     public static ProdutoEntity fromDTO(ProdutoDTO dto) {
