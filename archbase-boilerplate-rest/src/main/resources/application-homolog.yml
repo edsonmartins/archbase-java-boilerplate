@@ -1,0 +1,20 @@
+# ============================================
+# ARCHBASE BOILERPLATE - HOMOLOGATION
+# ============================================
+
+spring:
+  # JPA para homologação
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        show_sql: true
+        format_sql: false
+
+# Logging para homologação
+logging:
+  level:
+    root: INFO
+    br.com.archbase: INFO
+    br.com.archbase.boilerplate: INFO

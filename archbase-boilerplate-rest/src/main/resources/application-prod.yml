@@ -1,0 +1,41 @@
+# ============================================
+# ARCHBASE BOILERPLATE - PRODUCTION
+# ============================================
+
+spring:
+  # JPA para produção
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        show_sql: false
+
+  # Datasource de produção (use variáveis de ambiente)
+  datasource:
+    postgres:
+      jdbc-url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE}
+      username: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+
+# Logging para produção
+logging:
+  level:
+    root: WARN
+    br.com.archbase: INFO
+    br.com.archbase.boilerplate: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/archbase-boilerplate.log
+
+# Actuator mais restrito
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
