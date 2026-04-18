@@ -3,7 +3,12 @@
     "allow": [
       "Bash(curl:*)",
       "Bash(python3:*)",
-      "Bash(mvn:*)"
+      "Bash(mvn:*)",
+      "Bash(git -C /Users/edsonmartins/tmp/archbase-java-boilerplate log --oneline)",
+      "Bash(git -C /Users/edsonmartins/tmp/archbase-java-boilerplate diff --name-only HEAD~5..HEAD)",
+      "WebSearch",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAtualiza boilerplate com padrões vendax-promoter-api e gestor-rq-api\n\n- Atualiza Java de 17 para 21 com Virtual Threads habilitados\n- Atualiza Archbase Framework de 2.0.0 para 2.1.15\n- Atualiza Lombok para 1.18.40 \\(suporte Java 25\\)\n- Atualiza SpringDoc OpenAPI para 2.8.5\n- Adiciona Flyway 10.15.0 para migrations de banco\n- Adiciona GlobalExceptionHandler com ApiError padronizado\n- Adiciona exceções customizadas \\(EntityNotFoundException, DuplicateEntityException, BusinessValidationException\\)\n- Adiciona DTOs específicos \\(ProdutoCreateDTO, ProdutoUpdateDTO\\)\n- Adiciona estrutura de testes com JUnit 5 + Mockito\n- Adiciona migrations SQL \\(V1, V2\\)\n- Atualiza SecurityService com métodos isAuthenticated, isOwnerOrAdmin\n- Atualiza ProdutoService para usar novas exceções e DTOs\n- Atualiza ProdutoController com documentação OpenAPI completa\n- Atualiza DataSeedLoader para usar ProdutoCreateDTO\n- Atualiza CategoriaProduto com novas categorias\n- Atualiza README com documentação completa\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

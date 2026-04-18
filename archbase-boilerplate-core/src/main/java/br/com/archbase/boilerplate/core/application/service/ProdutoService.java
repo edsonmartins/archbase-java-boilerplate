@@ -1,7 +1,11 @@
 package br.com.archbase.boilerplate.core.application.service;
 
+import br.com.archbase.boilerplate.core.domain.dto.ProdutoCreateDTO;
 import br.com.archbase.boilerplate.core.domain.dto.ProdutoDTO;
+import br.com.archbase.boilerplate.core.domain.dto.ProdutoUpdateDTO;
 import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
+import br.com.archbase.boilerplate.core.domain.exception.DuplicateEntityException;
+import br.com.archbase.boilerplate.core.domain.exception.EntityNotFoundException;
 import br.com.archbase.boilerplate.core.infrastructure.output.persistence.entity.ProdutoEntity;
 import br.com.archbase.boilerplate.core.infrastructure.output.persistence.repository.ProdutoJpaRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +31,39 @@ public class ProdutoService {
     private final ProdutoJpaRepository repository;
 
     /**
-     * Cria um novo produto.
+     * Cria um novo produto a partir de ProdutoCreateDTO.
+     */
+    @Transactional
+    public ProdutoDTO criar(ProdutoCreateDTO dto) {
+        log.info("Criando produto: {}", dto.getNome());
+
+        // Verificar SKU único
+        if (dto.getSku() != null && repository.existsBySku(dto.getSku())) {
+            throw new DuplicateEntityException("Produto", "SKU", dto.getSku());
+        }
+
+        ProdutoEntity entity = ProdutoEntity.builder()
+                .nome(dto.getNome())
+                .descricao(dto.getDescricao())
+                .preco(dto.getPreco())
+                .estoque(dto.getEstoque() != null ? dto.getEstoque() : 0)
+                .categoria(dto.getCategoria())
+                .sku(dto.getSku())
+                .marca(dto.getMarca())
+                .urlImagem(dto.getUrlImagem())
+                .destaque(dto.getDestaque() != null ? dto.getDestaque() : false)
+                .ativo(true)
+                .dataCadastro(LocalDateTime.now())
+                .build();
+
+        ProdutoEntity saved = repository.save(entity);
+        log.info("Produto criado com ID: {}", saved.getId());
+
+        return saved.toDTO();
+    }
+
+    /**
+     * Cria um novo produto a partir de ProdutoDTO (mantido para compatibilidade).
      */
     @Transactional
     public ProdutoDTO criar(ProdutoDTO dto) {
@@ -35,7 +71,7 @@ public class ProdutoService {
 
         // Verificar SKU único
         if (dto.getSku() != null && repository.existsBySku(dto.getSku())) {
-            throw new IllegalArgumentException("SKU já existe: " + dto.getSku());
+            throw new DuplicateEntityException("Produto", "SKU", dto.getSku());
         }
 
         ProdutoEntity entity = ProdutoEntity.fromDTO(dto);
@@ -48,19 +84,54 @@ public class ProdutoService {
     }
 
     /**
-     * Atualiza um produto existente.
+     * Atualiza um produto existente com ProdutoUpdateDTO.
+     */
+    @Transactional
+    public ProdutoDTO atualizar(String id, ProdutoUpdateDTO dto) {
+        log.info("Atualizando produto: id={}", id);
+
+        ProdutoEntity entity = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Produto", id));
+
+        // Verificar SKU se foi alterado
+        if (dto.getSku() != null && !dto.getSku().equals(entity.getSku())) {
+            if (repository.existsBySku(dto.getSku())) {
+                throw new DuplicateEntityException("Produto", "SKU", dto.getSku());
+            }
+            entity.setSku(dto.getSku());
+        }
+
+        // Atualizar apenas campos não nulos
+        if (dto.getNome() != null) entity.setNome(dto.getNome());
+        if (dto.getDescricao() != null) entity.setDescricao(dto.getDescricao());
+        if (dto.getPreco() != null) entity.setPreco(dto.getPreco());
+        if (dto.getEstoque() != null) entity.setEstoque(dto.getEstoque());
+        if (dto.getCategoria() != null) entity.setCategoria(dto.getCategoria());
+        if (dto.getAtivo() != null) entity.setAtivo(dto.getAtivo());
+        if (dto.getMarca() != null) entity.setMarca(dto.getMarca());
+        if (dto.getUrlImagem() != null) entity.setUrlImagem(dto.getUrlImagem());
+        if (dto.getDestaque() != null) entity.setDestaque(dto.getDestaque());
+
+        ProdutoEntity saved = repository.save(entity);
+        log.info("Produto atualizado: {}", saved.getId());
+
+        return saved.toDTO();
+    }
+
+    /**
+     * Atualiza um produto existente com ProdutoDTO (mantido para compatibilidade).
      */
     @Transactional
     public ProdutoDTO atualizar(String id, ProdutoDTO dto) {
         log.info("Atualizando produto: id={}", id);
 
         ProdutoEntity entity = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Produto", id));
 
         // Verificar SKU se foi alterado
         if (dto.getSku() != null && !dto.getSku().equals(entity.getSku())) {
             if (repository.existsBySku(dto.getSku())) {
-                throw new IllegalArgumentException("SKU já existe: " + dto.getSku());
+                throw new DuplicateEntityException("Produto", "SKU", dto.getSku());
             }
         }
 
@@ -157,7 +228,7 @@ public class ProdutoService {
         log.info("Removendo produto: {}", id);
 
         if (!repository.existsById(id)) {
-            throw new IllegalArgumentException("Produto não encontrado: " + id);
+            throw new EntityNotFoundException("Produto", id);
         }
 
         repository.deleteById(id);
@@ -172,7 +243,7 @@ public class ProdutoService {
         log.info("Atualizando estoque do produto: {}, quantidade: {}", id, quantidade);
 
         ProdutoEntity entity = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Produto", id));
 
         entity.setEstoque(quantidade);
         ProdutoEntity saved = repository.save(entity);
@@ -188,7 +259,7 @@ public class ProdutoService {
         log.info("Ativando produto: {}", id);
 
         ProdutoEntity entity = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Produto", id));
 
         entity.setAtivo(true);
         return repository.save(entity).toDTO();
@@ -202,7 +273,7 @@ public class ProdutoService {
         log.info("Inativando produto: {}", id);
 
         ProdutoEntity entity = repository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Produto", id));
 
         entity.setAtivo(false);
         return repository.save(entity).toDTO();

@@ -1,10 +1,10 @@
 # Archbase Java Boilerplate
 
-> Boilerplate para criação de projetos backend Java com Spring Boot 3 e Archbase Framework v2.0
+> Boilerplate para criação de projetos backend Java com Spring Boot 3 e Archbase Framework v2.1
 
-[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.org/projects/jdk/17/)
+[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.6-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Archbase](https://img.shields.io/badge/Archbase-2.0.0-blue.svg)](https://github.com/edsonmartins/archbase-app-framework)
+[![Archbase](https://img.shields.io/badge/Archbase-2.1.15-blue.svg)](https://github.com/edsonmartins/archbase-app-framework)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -12,15 +12,18 @@
 ## Características
 
 - **[Spring Boot 3.5.6](https://spring.io/projects/spring-boot)** - Framework web com suporte a Jakarta EE
-- **[Java 17](https://openjdk.org/projects/jdk/17/)** - LTS com suporte extendido
-- **[Archbase Framework 2.0.0](https://github.com/edsonmartins/archbase-app-framework)** - Framework DDD brasileiro completo
+- **[Java 21](https://openjdk.org/projects/jdk/21/)** - LTS com Virtual Threads (Project Loom)
+- **[Archbase Framework 2.1.15](https://github.com/edsonmartins/archbase-app-framework)** - Framework DDD brasileiro completo
 - **[QueryDSL 5.1.0](https://querydsl.com/)** - Queries tipo-safe com JPA
 - **Arquitetura Hexagonal** - Ports e Adapters (limpa e testável)
 - **Multi-tenancy** - Suporte nativo a múltiplos tenants
+- **Virtual Threads** - Concorrência escalável com Java 21
 - **PostgreSQL 16** - Banco de dados principal
+- **Flyway** - Migrations de banco de dados versionadas
 - **H2** - Para desenvolvimento e testes
 - **Docker Compose** - Infraestrutura local completa
 - **OpenAPI/Swagger** - Documentação de API integrada
+- **Global Exception Handler** - Tratamento centralizado de erros
 - **MapStruct** - Mapeamento de objetos eficiente
 - **Lombok** - Redução de boilerplate
 
@@ -30,16 +33,19 @@
 
 | Tecnologia | Versão | Descrição |
 |------------|--------|-----------|
-| Java | 17 | LTS |
+| Java | 21 | LTS com Virtual Threads |
 | Spring Boot | 3.5.6 | Framework principal |
-| Archbase Framework | 2.0.0 | DDD, Security, Multitenancy |
+| Archbase Framework | 2.1.15 | DDD, Security, Multitenancy |
 | QueryDSL | 5.1.0 | Queries tipo-safe |
 | PostgreSQL | 16 | Banco de dados |
+| Flyway | 10.15.0 | Migrations |
 | H2 | 2.2.224 | Desenvolvimento |
 | MapStruct | 1.5.5.Final | Mapeamento |
-| Lombok | 1.18.34 | Boilerplate |
-| Springdoc OpenAPI | 2.5.0 | Documentação |
+| Lombok | 1.18.40 | Boilerplate |
+| Springdoc OpenAPI | 2.8.5 | Documentação |
 | Undertow | - | Servlet container |
+| JUnit 5 | - | Testes |
+| Mockito | - | Mocks para testes |
 
 ---
 
@@ -47,37 +53,57 @@
 
 ```
 archbase-java-boilerplate/
-├── archbase-boilerplate-core/     # Domínio, Aplicação e Persistência
-│   ├── domain/                     # Entities, DTOs, Enums
-│   ├── application/               # Services, ports, mappers
-│   └── infrastructure/            # JPA entities, repositories, adapters
+├── archbase-boilerplate-core/           # Domínio, Aplicação e Persistência
+│   ├── domain/
+│   │   ├── entity/                      # Entidades de domínio
+│   │   ├── dto/                         # DTOs (ProdutoDTO, ProdutoCreateDTO, ProdutoUpdateDTO)
+│   │   ├── enums/                       # Enumerações
+│   │   └── exception/                   # Exceções customizadas
+│   ├── application/
+│   │   ├── service/                     # Services de negócio
+│   │   │   └── security/                # SecurityService
+│   │   └── port/out/                    # Portas hexagonais
+│   └── infrastructure/output/persistence/
+│       ├── entity/                      # Entidades JPA
+│       ├── repository/                  # JPA Repositories
+│       ├── adapter/                     # QueryDSL Adapters
+│       └── mapper/                      # MapStruct Mappers
 │
-└── archbase-boilerplate-rest/      # REST API
-    └── infrastructure/input/rest/ # Controllers REST
+├── archbase-boilerplate-rest/           # REST API
+│   └── infrastructure/
+│       ├── config/                      # Configurações (CORS, OpenAPI, RateLimit)
+│       ├── error/                       # GlobalExceptionHandler, ApiError
+│       ├── input/rest/                  # Controllers REST
+│       └── seed/                        # DataSeedLoader
+│
+└── src/main/resources/
+    ├── db/migration/                    # Flyway migrations
+    ├── application.yml                  # Configuração principal
+    └── ehcache.xml                      # Configuração de cache
 ```
 
-```
-core/src/main/java/br/com/archbase/boilerplate/
-├── domain/                                  # DOMÍNIO (DDD)
-│   ├── entity/                              # Domain Objects
-│   └── enums/                               # Enums do domínio
-│
-├── application/                             # APLICAÇÃO
-│   ├── dto/                                 # DTOs
-│   ├── mapper/                              # MapStruct mappers
-│   └── service/                             # Services
-│
-└── infrastructure/output/persistence/        # INFRAESTRUTURA
-    ├── entity/                              # JPA Entities
-    ├── repository/                          # JPA Repositories
-    └── adapter/                             # QueryDSL Adapters
-```
+---
+
+## Padrões Implementados
+
+| Padrão | Descrição |
+|--------|-----------|
+| **Arquitetura Hexagonal** | Separação clara entre Domain, Application e Infrastructure |
+| **DTOs Específicos** | CreateDTO, UpdateDTO e ResponseDTO separados |
+| **Global Exception Handler** | Tratamento centralizado com ApiError padronizado |
+| **Custom Exceptions** | EntityNotFoundException, DuplicateEntityException, BusinessValidationException |
+| **Virtual Threads** | Habilitado para operações I/O-bound |
+| **Flyway Migrations** | Versionamento de schema do banco |
+| **OpenAPI 3.0** | Documentação completa com @ApiResponses |
+| **Testes Unitários** | JUnit 5 + Mockito com @Nested |
+| **SecurityService** | Verificação de roles e permissões |
+| **Multi-tenancy** | Via TenantPersistenceEntityBase |
 
 ---
 
 ## Pré-requisitos
 
-- **Java 17+** - [Download](https://adoptium.net/)
+- **Java 21+** - [Download](https://adoptium.net/)
 - **Maven 3.8+** - [Download](https://maven.apache.org/download.cgi)
 - **Docker** - [Download](https://www.docker.com/products/docker-desktop)
 - IDE recomendado: **IntelliJ IDEA**
@@ -109,13 +135,13 @@ mvn clean install
 
 ```bash
 cd archbase-boilerplate-rest
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 Ou execute o JAR:
 
 ```bash
-java -jar target/archbase-boilerplate-rest-1.0.0.jar
+java -jar target/archbase-boilerplate-rest-1.0.0.jar --spring.profiles.active=dev
 ```
 
 ### 5. Acesse a aplicação
@@ -134,29 +160,287 @@ java -jar target/archbase-boilerplate-rest-1.0.0.jar
 ### Variáveis de Ambiente
 
 ```bash
+# Profile
+APP_PROFILE=dev
+
 # Database
-DATABASE_URL=jdbc:postgresql://localhost:5432/archbase
-DATABASE_USER=archbase
-DATABASE_PASSWORD=archbase
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DATABASE=archbase_db
+POSTGRES_USER=archbase
+POSTGRES_PASSWORD=changeit
 
 # JWT
 ARCHBASE_JWT_SECRET=your-secret-key-change-in-production
 
 # CORS
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:4200
+
+# Multi-tenancy
+ARCHBASE_DEFAULT_TENANT_ID=a9f814d2-4dae-41f3-851b-8aa3d4706561
 ```
 
 ### Profiles
 
-- **dev** - Desenvolvimento com H2 em memória
-- **default** - Produção com PostgreSQL
+- **dev** - Desenvolvimento com H2 em memória e DataSeedLoader
+- **homolog** - Homologação com PostgreSQL
+- **prod** - Produção com PostgreSQL e configurações seguras
 
 ```bash
 # Desenvolvimento
 java -jar app.jar --spring.profiles.active=dev
 
 # Produção
-java -jar app.jar
+java -jar app.jar --spring.profiles.active=prod
+```
+
+### Virtual Threads (Java 21)
+
+Virtual Threads estão habilitados por padrão no `application.yml`:
+
+```yaml
+spring:
+  threads:
+    virtual:
+      enabled: true
+```
+
+---
+
+## API Endpoints
+
+### Produtos
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST | `/api/v1/produtos` | Criar produto |
+| GET | `/api/v1/produtos/{id}` | Buscar por ID |
+| GET | `/api/v1/produtos/sku/{sku}` | Buscar por SKU |
+| GET | `/api/v1/produtos/findAll` | Listar paginado |
+| GET | `/api/v1/produtos/ativos` | Listar ativos |
+| GET | `/api/v1/produtos/categoria/{categoria}` | Listar por categoria |
+| PUT | `/api/v1/produtos/{id}` | Atualizar produto |
+| PATCH | `/api/v1/produtos/{id}/estoque` | Atualizar estoque |
+| POST | `/api/v1/produtos/{id}/ativar` | Ativar produto |
+| POST | `/api/v1/produtos/{id}/inativar` | Inativar produto |
+| DELETE | `/api/v1/produtos/{id}` | Deletar produto |
+
+### Exemplo de Requisição - Criar Produto
+
+```bash
+curl -X POST http://localhost:8080/api/v1/produtos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Notebook Dell",
+    "sku": "NOTE-001",
+    "descricao": "Notebook Dell Inspiron 15",
+    "preco": 3500.00,
+    "categoria": "ELETRONICOS",
+    "estoque": 10,
+    "marca": "Dell"
+  }'
+```
+
+### Exemplo de Requisição - Atualizar Produto (Parcial)
+
+```bash
+curl -X PUT http://localhost:8080/api/v1/produtos/{id} \
+  -H "Content-Type: application/json" \
+  -d '{
+    "preco": 3299.00,
+    "estoque": 15
+  }'
+```
+
+### Resposta de Erro Padrão
+
+```json
+{
+  "status": "BAD_REQUEST",
+  "timestamp": "18-04-2026 15:30:45",
+  "message": "Erro de validação",
+  "subErrors": [
+    {
+      "object": "produtoCreateDTO",
+      "field": "nome",
+      "rejectedValue": "",
+      "message": "O nome é obrigatório"
+    }
+  ]
+}
+```
+
+---
+
+## Exceções Customizadas
+
+| Exceção | HTTP Status | Uso |
+|---------|-------------|-----|
+| `EntityNotFoundException` | 404 | Entidade não encontrada |
+| `DuplicateEntityException` | 409 | SKU ou campo único duplicado |
+| `BusinessValidationException` | 422 | Regra de negócio violada |
+| `BoilerplateException` | 400 | Exceção genérica de negócio |
+
+### Exemplo de Uso
+
+```java
+ProdutoEntity entity = repository.findById(id)
+    .orElseThrow(() -> new EntityNotFoundException("Produto", id));
+
+if (repository.existsBySku(dto.getSku())) {
+    throw new DuplicateEntityException("Produto", "SKU", dto.getSku());
+}
+```
+
+---
+
+## DTOs
+
+### ProdutoCreateDTO
+
+```java
+@Data
+@Builder
+public class ProdutoCreateDTO {
+    @NotBlank(message = "O nome é obrigatório")
+    private String nome;
+
+    @NotNull(message = "O preço é obrigatório")
+    @Positive(message = "O preço deve ser maior que zero")
+    private BigDecimal preco;
+
+    @NotNull(message = "A categoria é obrigatória")
+    private CategoriaProduto categoria;
+
+    private String descricao;
+    private Integer estoque;
+    private String sku;
+    private String marca;
+}
+```
+
+### ProdutoUpdateDTO
+
+```java
+@Data
+@Builder
+public class ProdutoUpdateDTO {
+    // Todos os campos opcionais para update parcial
+    private String nome;
+    private BigDecimal preco;
+    private CategoriaProduto categoria;
+    private Boolean ativo;
+    // ...
+}
+```
+
+---
+
+## Flyway Migrations
+
+As migrations estão em `archbase-boilerplate-rest/src/main/resources/db/migration/`:
+
+```
+db/migration/
+├── V1__create_produto_table.sql      # Criação da tabela produto
+└── V2__add_audit_columns.sql         # Colunas de auditoria
+```
+
+### Criar Nova Migration
+
+```sql
+-- V3__add_new_feature.sql
+ALTER TABLE produto ADD COLUMN nova_coluna VARCHAR(100);
+```
+
+---
+
+## Testes
+
+### Estrutura de Testes
+
+```
+src/test/java/
+└── br/com/archbase/boilerplate/core/
+    └── application/service/
+        └── ProdutoServiceTest.java
+```
+
+### Executar Testes
+
+```bash
+mvn test
+```
+
+### Exemplo de Teste
+
+```java
+@ExtendWith(MockitoExtension.class)
+@DisplayName("ProdutoService - Testes")
+class ProdutoServiceTest {
+
+    @Mock
+    private ProdutoJpaRepository repository;
+
+    @InjectMocks
+    private ProdutoService service;
+
+    @Nested
+    @DisplayName("Método criar")
+    class CriarTests {
+
+        @Test
+        @DisplayName("Deve criar produto com dados válidos")
+        void deveCriarProdutoComDadosValidos() {
+            // Given
+            when(repository.existsBySku(anyString())).thenReturn(false);
+            when(repository.save(any())).thenReturn(produtoEntity);
+
+            // When
+            ProdutoDTO result = service.criar(createDTO);
+
+            // Then
+            assertThat(result).isNotNull();
+            verify(repository).save(any());
+        }
+    }
+}
+```
+
+---
+
+## SecurityService
+
+O `SecurityService` fornece métodos para verificação de roles e permissões:
+
+```java
+@Service
+@RequiredArgsConstructor
+public class MyService {
+
+    private final SecurityService securityService;
+
+    public void myMethod() {
+        // Verifica se é admin
+        if (securityService.isAdmin()) {
+            // Lógica de admin
+        }
+
+        // Verifica role específica
+        if (securityService.hasRole("SUPERVISOR")) {
+            // Lógica de supervisor
+        }
+
+        // Verifica se é dono do recurso ou admin
+        if (securityService.isOwnerOrAdmin(resourceOwnerId)) {
+            // Permite acesso
+        }
+
+        // Obtém dados do usuário
+        String userId = securityService.getCurrentUserId();
+        String tenantId = securityService.getCurrentTenantId();
+    }
+}
 ```
 
 ---
@@ -172,124 +456,6 @@ make test           # Executa testes
 make clean          # Limpa build
 make docker-up      # Sobe containers Docker
 make docker-down    # Para containers Docker
-```
-
----
-
-## API Endpoints
-
-### Produtos
-
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| POST | `/api/v1/produtos` | Criar produto |
-| GET | `/api/v1/produtos/{id}` | Buscar por ID |
-| GET | `/api/v1/produtos/findAll` | Listar paginado |
-| GET | `/api/v1/produtos/ativos` | Listar ativos |
-| GET | `/api/v1/produtos/categoria/{categoria}` | Listar por categoria |
-| PUT | `/api/v1/produtos/{id}` | Atualizar produto |
-| DELETE | `/api/v1/produtos/{id}` | Deletar produto |
-
-### Exemplo de Requisição
-
-```bash
-# Criar produto
-curl -X POST http://localhost:8080/api/v1/produtos \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nome": "Notebook Dell",
-    "sku": "NOTE-001",
-    "descricao": "Notebook Dell Inspiron 15",
-    "preco": 3500.00,
-    "categoria": "ELETRONICOS",
-    "estoque": 10,
-    "ativo": true
-  }'
-```
-
----
-
-## Padrões Arquiteturais
-
-### Repository Pattern
-
-```java
-@Repository
-public interface ExampleJpaRepository extends ArchbaseCommonJpaRepository<ExampleEntity, String, Long> {
-    // SEM métodos customizados - queries via QueryDSL no adapter
-}
-```
-
-**CRÍTICO**: Sempre use `ArchbaseCommonJpaRepository<Entity, ID, Long>` como base.
-
-### Entity Pattern
-
-```java
-@Entity
-@Table(name = "EXAMPLE")
-@Getter
-@Setter
-public class ExampleEntity extends TenantPersistenceEntityBase {
-    @Column(name = "NOME")
-    private String nome;
-}
-```
-
-**CRÍTICO**: Entities devem estender `TenantPersistenceEntityBase` para multi-tenancy.
-
-### Security
-
-```java
-import br.com.archbase.security.annotations.RequireRole;
-
-@RestController
-public class ExampleController {
-
-    @RequireRole({"ADMIN", "SUPERVISOR"})
-    public ResponseEntity<ExampleDTO> create() {
-        // Apenas ADMIN e SUPERVISOR
-    }
-}
-```
-
-**CRÍTICO**: Use anotações Archbase (`@RequireRole`), NUNCA Spring Security (`@PreAuthorize`).
-
----
-
-## Documentação da API
-
-A documentação interativa está disponível via Swagger UI:
-
-```
-http://localhost:8080/swagger-ui/index.html
-```
-
-Especificação OpenAPI:
-
-```
-http://localhost:8080/v3/api-docs
-```
-
----
-
-## Desenvolvimento
-
-### Gerar classes QueryDSL
-
-```bash
-mvn clean process-sources
-```
-
-### Executar testes
-
-```bash
-mvn test
-```
-
-### Build para produção
-
-```bash
-mvn clean package -DskipTests
 ```
 
 ---
@@ -312,6 +478,74 @@ docker-compose up -d
 
 ```bash
 docker-compose down
+```
+
+---
+
+## Boas Práticas
+
+### Repository Pattern
+
+```java
+@Repository
+public interface ExampleJpaRepository extends ArchbaseCommonJpaRepository<ExampleEntity, String, Long> {
+    // Queries simples aqui, queries complexas no Adapter com QueryDSL
+}
+```
+
+### Entity Pattern
+
+```java
+@Entity
+@Table(name = "example", indexes = {
+    @Index(name = "idx_example_nome", columnList = "nome")
+})
+@Getter
+@Setter
+public class ExampleEntity extends TenantPersistenceEntityBase {
+    @Column(name = "nome", nullable = false)
+    private String nome;
+}
+```
+
+### Controller Pattern
+
+```java
+@RestController
+@RequestMapping("/api/v1/examples")
+@Tag(name = "Examples", description = "Gerenciamento de Examples")
+@SecurityRequirement(name = "bearerAuth")
+@RequiredArgsConstructor
+@Validated
+public class ExampleController {
+
+    @PostMapping
+    @Operation(summary = "Criar novo example")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Criado com sucesso"),
+        @ApiResponse(responseCode = "400", description = "Dados inválidos")
+    })
+    public ResponseEntity<ExampleDTO> criar(@Valid @RequestBody ExampleCreateDTO dto) {
+        // Sem try-catch - GlobalExceptionHandler trata as exceções
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.criar(dto));
+    }
+}
+```
+
+---
+
+## Documentação da API
+
+A documentação interativa está disponível via Swagger UI:
+
+```
+http://localhost:8080/swagger-ui/index.html
+```
+
+Especificação OpenAPI:
+
+```
+http://localhost:8080/v3/api-docs
 ```
 
 ---
@@ -372,3 +606,4 @@ SOFTWARE.
 - [Spring Boot](https://spring.io/projects/spring-boot) - Framework Spring
 - [QueryDSL](https://querydsl.com/) - Queries tipo-safe para Java
 - [MapStruct](https://mapstruct.org/) - Mapeamento de objetos Java
+- [Flyway](https://flywaydb.org/) - Migrations de banco de dados

@@ -8,6 +8,11 @@ spring:
   application:
     name: archbase-boilerplate
 
+  # Virtual Threads (Java 21+)
+  threads:
+    virtual:
+      enabled: true
+
   # Datasource Configuration
   datasource:
     postgres:
@@ -16,12 +21,20 @@ spring:
       username: ${POSTGRES_USER:archbase}
       password: ${POSTGRES_PASSWORD:changeit}
       hikari:
-        maximum-pool-size: 20
-        minimum-idle: 5
+        maximum-pool-size: 15
+        minimum-idle: 4
         connection-timeout: 30000
         idle-timeout: 600000
         max-lifetime: 1800000
         pool-name: ArchbaseHikariPool
+
+  # Flyway Migrations
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
 
   # JPA Configuration
   jpa:

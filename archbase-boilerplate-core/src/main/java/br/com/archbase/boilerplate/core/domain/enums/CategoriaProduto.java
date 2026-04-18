@@ -10,11 +10,14 @@ public enum CategoriaProduto {
 
     ELETRONICOS("Eletrônicos"),
     MOVEIS("Móveis"),
-    vestuario("Vestuário"),
+    ROUPAS("Roupas"),
+    VESTUARIO("Vestuário"),
     ALIMENTOS("Alimentos"),
     BEBIDAS("Bebidas"),
     LIMPEZA("Limpeza"),
     HIGIENE("Higiene"),
+    ESPORTES("Esportes"),
+    LIVROS("Livros"),
     OUTROS("Outros");
 
     private final String descricao;

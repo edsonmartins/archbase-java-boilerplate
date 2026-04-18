@@ -1,10 +1,17 @@
 package br.com.archbase.boilerplate.rest.infrastructure.input.rest;
 
 import br.com.archbase.boilerplate.core.application.service.ProdutoService;
+import br.com.archbase.boilerplate.core.domain.dto.ProdutoCreateDTO;
 import br.com.archbase.boilerplate.core.domain.dto.ProdutoDTO;
+import br.com.archbase.boilerplate.core.domain.dto.ProdutoUpdateDTO;
 import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,10 +26,12 @@ import java.util.List;
 
 /**
  * Controller REST para gerenciamento de Produtos.
+ * Segue os padrões dos projetos vendax-promoter-api e gestor-rq-api.
  */
 @RestController
 @RequestMapping("/api/v1/produtos")
-@Tag(name = "Produtos", description = "Operações relacionadas ao gerenciamento de produtos")
+@Tag(name = "Produtos", description = "Gerenciamento de Produtos")
+@SecurityRequirement(name = "bearerAuth")
 @RequiredArgsConstructor
 @Slf4j
 @Validated
@@ -34,203 +43,163 @@ public class ProdutoController {
     // CRUD Operations
     // ===========================
 
-    @Operation(summary = "Criar novo produto")
     @PostMapping
-    public ResponseEntity<ProdutoDTO> criar(@Valid @RequestBody ProdutoDTO dto) {
-        try {
-            log.info("Criando novo produto: {}", dto.getNome());
-            ProdutoDTO created = service.criar(dto);
-            return ResponseEntity.status(HttpStatus.CREATED).body(created);
-        } catch (IllegalArgumentException e) {
-            log.warn("Erro ao criar produto: {}", e.getMessage());
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            log.error("Erro ao criar produto", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    @Operation(summary = "Criar novo produto")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "Produto criado com sucesso",
+                    content = @Content(schema = @Schema(implementation = ProdutoDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "401", description = "Não autenticado"),
+            @ApiResponse(responseCode = "409", description = "SKU já existe")
+    })
+    public ResponseEntity<ProdutoDTO> criar(@Valid @RequestBody ProdutoCreateDTO dto) {
+        log.info("Criando novo produto: {}", dto.getNome());
+        ProdutoDTO created = service.criar(dto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    @Operation(summary = "Atualizar produto existente")
     @PutMapping("/{id}")
+    @Operation(summary = "Atualizar produto existente")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produto atualizado com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "404", description = "Produto não encontrado"),
+            @ApiResponse(responseCode = "409", description = "SKU já existe")
+    })
     public ResponseEntity<ProdutoDTO> atualizar(
             @Parameter(description = "ID do produto", required = true) @PathVariable String id,
-            @Valid @RequestBody ProdutoDTO dto) {
-        try {
-            log.info("Atualizando produto: id={}", id);
-            ProdutoDTO updated = service.atualizar(id, dto);
-            return ResponseEntity.ok(updated);
-        } catch (IllegalArgumentException e) {
-            log.warn("Produto não encontrado: {}", id);
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Erro ao atualizar produto {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+            @Valid @RequestBody ProdutoUpdateDTO dto) {
+        log.info("Atualizando produto: id={}", id);
+        ProdutoDTO updated = service.atualizar(id, dto);
+        return ResponseEntity.ok(updated);
     }
 
-    @Operation(summary = "Buscar produto por ID")
     @GetMapping("/{id}")
+    @Operation(summary = "Buscar produto por ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produto encontrado"),
+            @ApiResponse(responseCode = "404", description = "Produto não encontrado")
+    })
     public ResponseEntity<ProdutoDTO> buscarPorId(
             @Parameter(description = "ID do produto", required = true) @PathVariable String id) {
-        try {
-            log.debug("Buscando produto por ID: {}", id);
-            ProdutoDTO produto = service.buscarPorId(id);
-            return produto != null ? ResponseEntity.ok(produto) : ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Erro ao buscar produto {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.debug("Buscando produto por ID: {}", id);
+        ProdutoDTO produto = service.buscarPorId(id);
+        return produto != null ? ResponseEntity.ok(produto) : ResponseEntity.notFound().build();
     }
 
-    @Operation(summary = "Buscar produto por SKU")
     @GetMapping("/sku/{sku}")
+    @Operation(summary = "Buscar produto por SKU")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produto encontrado"),
+            @ApiResponse(responseCode = "404", description = "Produto não encontrado")
+    })
     public ResponseEntity<ProdutoDTO> buscarPorSku(
             @Parameter(description = "SKU do produto", required = true) @PathVariable String sku) {
-        try {
-            log.debug("Buscando produto por SKU: {}", sku);
-            ProdutoDTO produto = service.buscarPorSku(sku);
-            return produto != null ? ResponseEntity.ok(produto) : ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Erro ao buscar produto por SKU {}", sku, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.debug("Buscando produto por SKU: {}", sku);
+        ProdutoDTO produto = service.buscarPorSku(sku);
+        return produto != null ? ResponseEntity.ok(produto) : ResponseEntity.notFound().build();
     }
 
-    @Operation(summary = "Remover produto")
     @DeleteMapping("/{id}")
+    @Operation(summary = "Remover produto")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "204", description = "Produto removido com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Produto não encontrado")
+    })
     public ResponseEntity<Void> remover(
             @Parameter(description = "ID do produto", required = true) @PathVariable String id) {
-        try {
-            log.info("Removendo produto: {}", id);
-            service.remover(id);
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            log.error("Erro ao remover produto {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.info("Removendo produto: {}", id);
+        service.remover(id);
+        return ResponseEntity.noContent().build();
     }
 
     // ===========================
     // Business Operations
     // ===========================
 
-    @Operation(summary = "Ativar produto")
     @PostMapping("/{id}/ativar")
+    @Operation(summary = "Ativar produto")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produto ativado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Produto não encontrado")
+    })
     public ResponseEntity<ProdutoDTO> ativar(
             @Parameter(description = "ID do produto", required = true) @PathVariable String id) {
-        try {
-            log.info("Ativando produto: {}", id);
-            ProdutoDTO produto = service.ativar(id);
-            return ResponseEntity.ok(produto);
-        } catch (IllegalArgumentException e) {
-            log.warn("Produto não encontrado: {}", id);
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Erro ao ativar produto {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.info("Ativando produto: {}", id);
+        ProdutoDTO produto = service.ativar(id);
+        return ResponseEntity.ok(produto);
     }
 
-    @Operation(summary = "Inativar produto")
     @PostMapping("/{id}/inativar")
+    @Operation(summary = "Inativar produto")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produto inativado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Produto não encontrado")
+    })
     public ResponseEntity<ProdutoDTO> inativar(
             @Parameter(description = "ID do produto", required = true) @PathVariable String id) {
-        try {
-            log.info("Inativando produto: {}", id);
-            ProdutoDTO produto = service.inativar(id);
-            return ResponseEntity.ok(produto);
-        } catch (IllegalArgumentException e) {
-            log.warn("Produto não encontrado: {}", id);
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Erro ao inativar produto {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.info("Inativando produto: {}", id);
+        ProdutoDTO produto = service.inativar(id);
+        return ResponseEntity.ok(produto);
     }
 
-    @Operation(summary = "Atualizar estoque do produto")
     @PatchMapping("/{id}/estoque")
+    @Operation(summary = "Atualizar estoque do produto")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Estoque atualizado com sucesso"),
+            @ApiResponse(responseCode = "404", description = "Produto não encontrado")
+    })
     public ResponseEntity<ProdutoDTO> atualizarEstoque(
             @Parameter(description = "ID do produto", required = true) @PathVariable String id,
             @Parameter(description = "Nova quantidade em estoque", required = true) @RequestParam Integer quantidade) {
-        try {
-            log.info("Atualizando estoque do produto {}: {}", id, quantidade);
-            ProdutoDTO produto = service.atualizarEstoque(id, quantidade);
-            return ResponseEntity.ok(produto);
-        } catch (IllegalArgumentException e) {
-            log.warn("Produto não encontrado: {}", id);
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            log.error("Erro ao atualizar estoque do produto {}", id, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.info("Atualizando estoque do produto {}: {}", id, quantidade);
+        ProdutoDTO produto = service.atualizarEstoque(id, quantidade);
+        return ResponseEntity.ok(produto);
     }
 
     // ===========================
     // Query Operations
     // ===========================
 
-    @Operation(summary = "Buscar produtos por categoria")
     @GetMapping("/categoria/{categoria}")
+    @Operation(summary = "Buscar produtos por categoria")
     public ResponseEntity<List<ProdutoDTO>> buscarPorCategoria(
             @Parameter(description = "Categoria do produto", required = true) @PathVariable CategoriaProduto categoria) {
-        try {
-            log.debug("Buscando produtos por categoria: {}", categoria);
-            List<ProdutoDTO> produtos = service.buscarPorCategoria(categoria);
-            return produtos.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(produtos);
-        } catch (Exception e) {
-            log.error("Erro ao buscar produtos por categoria {}", categoria, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.debug("Buscando produtos por categoria: {}", categoria);
+        List<ProdutoDTO> produtos = service.buscarPorCategoria(categoria);
+        return produtos.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(produtos);
     }
 
-    @Operation(summary = "Buscar produtos ativos")
     @GetMapping("/ativos")
+    @Operation(summary = "Buscar produtos ativos")
     public ResponseEntity<List<ProdutoDTO>> buscarAtivos() {
-        try {
-            log.debug("Buscando produtos ativos");
-            List<ProdutoDTO> produtos = service.buscarAtivos();
-            return produtos.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(produtos);
-        } catch (Exception e) {
-            log.error("Erro ao buscar produtos ativos", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        log.debug("Buscando produtos ativos");
+        List<ProdutoDTO> produtos = service.buscarAtivos();
+        return produtos.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(produtos);
     }
 
     // ===========================
     // Pagination Operations
     // ===========================
 
-    @Operation(summary = "Listar todos os produtos com paginação")
     @GetMapping(value = "/findAll", params = {"page", "size"})
+    @Operation(summary = "Listar todos os produtos com paginação")
     @ResponseStatus(HttpStatus.OK)
-    @ResponseBody
     public Page<ProdutoDTO> findAll(
-            @Parameter(description = "Número da página") @RequestParam("page") int page,
-            @Parameter(description = "Tamanho da página") @RequestParam("size") int size) {
-        try {
-            log.debug("Buscando todos os produtos - página: {}, tamanho: {}", page, size);
-            return service.buscarTodos(page, size);
-        } catch (Exception e) {
-            log.error("Erro ao buscar todos os produtos", e);
-            throw e;
-        }
+            @Parameter(description = "Número da página (0-indexed)", example = "0") @RequestParam("page") int page,
+            @Parameter(description = "Tamanho da página", example = "20") @RequestParam("size") int size) {
+        log.debug("Buscando todos os produtos - página: {}, tamanho: {}", page, size);
+        return service.buscarTodos(page, size);
     }
 
-    @Operation(summary = "Listar todos os produtos com paginação e ordenação")
     @GetMapping(value = "/findAll", params = {"page", "size", "sort"})
+    @Operation(summary = "Listar todos os produtos com paginação e ordenação")
     @ResponseStatus(HttpStatus.OK)
-    @ResponseBody
     public Page<ProdutoDTO> findAll(
-            @Parameter(description = "Número da página") @RequestParam("page") int page,
-            @Parameter(description = "Tamanho da página") @RequestParam("size") int size,
-            @Parameter(description = "Ordenação") @RequestParam("sort") String[] sort) {
-        try {
-            log.debug("Buscando todos os produtos com ordenação - página: {}, tamanho: {}", page, size);
-            return service.buscarTodos(page, size, sort);
-        } catch (Exception e) {
-            log.error("Erro ao buscar todos os produtos com ordenação", e);
-            throw e;
-        }
+            @Parameter(description = "Número da página (0-indexed)", example = "0") @RequestParam("page") int page,
+            @Parameter(description = "Tamanho da página", example = "20") @RequestParam("size") int size,
+            @Parameter(description = "Ordenação (ex: nome,desc)", example = "nome,asc") @RequestParam("sort") String[] sort) {
+        log.debug("Buscando todos os produtos com ordenação - página: {}, tamanho: {}", page, size);
+        return service.buscarTodos(page, size, sort);
     }
 }

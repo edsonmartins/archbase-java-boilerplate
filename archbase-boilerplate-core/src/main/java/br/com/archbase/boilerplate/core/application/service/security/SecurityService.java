@@ -287,4 +287,41 @@ public class SecurityService {
                 resourceTenantId, currentUserTenant, canAccess);
         return canAccess;
     }
+
+    /**
+     * Verifica se o usuário está autenticado.
+     *
+     * @return true se o usuário está autenticado
+     */
+    public boolean isAuthenticated() {
+        return getCurrentUser() != null;
+    }
+
+    /**
+     * Verifica se o recurso pertence ao usuário atual ou se é administrador.
+     * <p>
+     * Útil para operações onde admins podem acessar recursos de qualquer usuário
+     * mas usuários comuns só podem acessar seus próprios recursos.
+     * </p>
+     *
+     * @param resourceOwnerId ID do proprietário do recurso
+     * @return true se o recurso pertence ao usuário atual ou se é administrador
+     */
+    public boolean isOwnerOrAdmin(String resourceOwnerId) {
+        if (isAdmin()) {
+            return true;
+        }
+        String currentUserId = getCurrentUserId();
+        return currentUserId != null && currentUserId.equals(resourceOwnerId);
+    }
+
+    /**
+     * Verifica se o recurso pertence ao tenant atual ou se é administrador.
+     *
+     * @param resourceTenantId Tenant do recurso
+     * @return true se pode acessar
+     */
+    public boolean canAccessTenantOrAdmin(String resourceTenantId) {
+        return isAdmin() || canAccessTenant(resourceTenantId);
+    }
 }
