@@ -1,9 +1,9 @@
 package br.com.archbase.boilerplate.rest.infrastructure.input.rest;
 
 import br.com.archbase.boilerplate.core.application.service.ProdutoService;
-import br.com.archbase.boilerplate.core.domain.dto.ProdutoCreateDTO;
-import br.com.archbase.boilerplate.core.domain.dto.ProdutoDTO;
-import br.com.archbase.boilerplate.core.domain.dto.ProdutoUpdateDTO;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoCreateDTO;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoDTO;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoUpdateDTO;
 import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

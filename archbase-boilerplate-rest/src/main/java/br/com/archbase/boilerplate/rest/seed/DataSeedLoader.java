@@ -1,7 +1,7 @@
 package br.com.archbase.boilerplate.rest.seed;
 
 import br.com.archbase.boilerplate.core.application.service.ProdutoService;
-import br.com.archbase.boilerplate.core.domain.dto.ProdutoCreateDTO;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoCreateDTO;
 import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

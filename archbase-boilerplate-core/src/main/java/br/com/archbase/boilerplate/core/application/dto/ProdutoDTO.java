@@ -1,4 +1,4 @@
-package br.com.archbase.boilerplate.core.domain.dto;
+package br.com.archbase.boilerplate.core.application.dto;
 
 import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * DTO de Produto para transferência de dados.
+ * DTO de Produto para transferencia de dados.
  */
 @Data
 @Builder
@@ -34,7 +34,7 @@ public class ProdutoDTO {
     private String lastModifiedByUser;
     private String tenantId;
 
-    // Campos de negócio
+    // Campos de negocio
     private String nome;
     private String descricao;
     private BigDecimal preco;
@@ -42,6 +42,9 @@ public class ProdutoDTO {
     private CategoriaProduto categoria;
     private Boolean ativo;
     private String sku;
+    private String marca;
+    private String urlImagem;
+    private Boolean destaque;
 
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime dataCadastro;

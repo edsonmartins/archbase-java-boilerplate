@@ -1,8 +1,10 @@
 package br.com.archbase.boilerplate.core.application.port.out;
 
+import br.com.archbase.boilerplate.core.application.dto.ProdutoEstatisticasDTO;
 import br.com.archbase.boilerplate.core.domain.entity.Produto;
 import br.com.archbase.ddd.domain.contracts.FindDataWithFilterQuery;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,4 +61,24 @@ public interface ProdutoPersistencePort extends FindDataWithFilterQuery<String, 
      * Remove produto por ID.
      */
     void deleteById(String id);
+
+    /**
+     * Obtém estatísticas agregadas dos produtos.
+     */
+    ProdutoEstatisticasDTO obterEstatisticas();
+
+    /**
+     * Busca produtos por faixa de preço.
+     */
+    List<Produto> findByPrecoEntre(BigDecimal min, BigDecimal max);
+
+    /**
+     * Busca produtos em destaque.
+     */
+    List<Produto> findEmDestaque();
+
+    /**
+     * Busca produtos por marca.
+     */
+    List<Produto> findByMarca(String marca);
 }

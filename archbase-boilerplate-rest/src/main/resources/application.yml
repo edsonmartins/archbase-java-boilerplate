@@ -28,18 +28,10 @@ spring:
         max-lifetime: 1800000
         pool-name: ArchbaseHikariPool
 
-  # Flyway Migrations
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    baseline-version: 0
-    validate-on-migrate: true
-
   # JPA Configuration
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
@@ -70,6 +62,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
   # Web Configuration
   web:
@@ -106,6 +99,12 @@ openapi:
     dev:
       url: http://localhost:${APP_PORT:8080}
       description: Development server
+    homolog:
+      url: ${OPENAPI_HOMOLOG_URL:}
+      description: Homologation server
+    prod:
+      url: ${OPENAPI_PROD_URL:}
+      description: Production server
 
 # Archbase Framework Configuration
 archbase:

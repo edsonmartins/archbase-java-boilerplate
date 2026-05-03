@@ -20,6 +20,9 @@ public class JedisConfig {
     @Value("${spring.data.redis.port:6379}")
     private int redisPort;
 
+    @Value("${spring.data.redis.password:}")
+    private String redisPassword;
+
     @Bean
     public JedisPool jedisPool() {
         JedisPoolConfig poolConfig = new JedisPoolConfig();
@@ -29,6 +32,10 @@ public class JedisConfig {
         poolConfig.setTestOnBorrow(true);
         poolConfig.setTestOnReturn(true);
         poolConfig.setTestWhileIdle(true);
+
+        if (redisPassword != null && !redisPassword.isBlank()) {
+            return new JedisPool(poolConfig, redisHost, redisPort, 2000, redisPassword);
+        }
         return new JedisPool(poolConfig, redisHost, redisPort);
     }
 }

@@ -1,8 +1,8 @@
 package br.com.archbase.boilerplate.core.application.service;
 
-import br.com.archbase.boilerplate.core.domain.dto.ProdutoCreateDTO;
-import br.com.archbase.boilerplate.core.domain.dto.ProdutoDTO;
-import br.com.archbase.boilerplate.core.domain.dto.ProdutoUpdateDTO;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoCreateDTO;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoDTO;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoUpdateDTO;
 import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
 import br.com.archbase.boilerplate.core.domain.exception.DuplicateEntityException;
 import br.com.archbase.boilerplate.core.domain.exception.EntityNotFoundException;

@@ -1,6 +1,6 @@
 package br.com.archbase.boilerplate.core.infrastructure.output.persistence.entity;
 
-import br.com.archbase.boilerplate.core.domain.dto.ProdutoDTO;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoDTO;
 import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
 import br.com.archbase.ddd.domain.base.TenantPersistenceEntityBase;
 import jakarta.persistence.*;
