@@ -115,7 +115,7 @@ class ProdutoServiceTest {
                     .isInstanceOf(DuplicateEntityException.class)
                     .hasMessageContaining("SKU");
 
-            verify(repository, never()).save(any());
+            verify(repository, never()).save(any(ProdutoEntity.class));
         }
 
         @Test
@@ -170,7 +170,7 @@ class ProdutoServiceTest {
                     .isInstanceOf(EntityNotFoundException.class)
                     .hasMessageContaining("Produto");
 
-            verify(repository, never()).save(any());
+            verify(repository, never()).save(any(ProdutoEntity.class));
         }
 
         @Test
@@ -187,7 +187,7 @@ class ProdutoServiceTest {
                     .isInstanceOf(DuplicateEntityException.class)
                     .hasMessageContaining("SKU");
 
-            verify(repository, never()).save(any());
+            verify(repository, never()).save(any(ProdutoEntity.class));
         }
     }
 

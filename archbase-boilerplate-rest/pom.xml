@@ -34,10 +34,10 @@
             </exclusions>
         </dependency>
 
-        <!-- Undertow instead of Tomcat -->
+        <!-- Jetty no lugar do Tomcat (Spring Boot 4 removeu o suporte a Undertow) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-undertow</artifactId>
+            <artifactId>spring-boot-starter-jetty</artifactId>
         </dependency>
 
         <!-- Spring Boot Security -->
@@ -46,14 +46,10 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- OpenAPI/Swagger -->
+        <!-- OpenAPI (swagger-annotations-jakarta vem transitivo do archbase 3.0.0) -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.swagger.core.v3</groupId>
-            <artifactId>swagger-annotations</artifactId>
         </dependency>
 
         <!-- Validation -->

@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.6</version>
+        <version>4.1.0</version>
         <relativePath/>
     </parent>
 
@@ -16,7 +16,7 @@
     <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>Archbase Java Boilerplate</name>
-    <description>Boilerplate para projetos Java com Spring Boot 3 e Archbase Framework</description>
+    <description>Boilerplate para projetos Java com Spring Boot 4 e Archbase Framework 3</description>
 
     <modules>
         <module>archbase-boilerplate-core</module>
@@ -24,40 +24,40 @@
     </modules>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Archbase Framework -->
-        <archbase.version>2.1.15</archbase.version>
+        <archbase.version>3.0.0</archbase.version>
 
         <!-- MapStruct -->
-        <org.mapstruct.version>1.5.5.Final</org.mapstruct.version>
+        <org.mapstruct.version>1.6.3</org.mapstruct.version>
 
-        <!-- QueryDSL -->
-        <querydsl.version>5.1.0</querydsl.version>
+        <!-- QueryDSL: fork Jakarta (openfeign) alinhado ao archbase 3.0.0 / Hibernate 7.
+             NÃO sobrescrever querydsl.version (o spring-boot-dependencies usa p/ o querydsl-bom). -->
+        <openfeign-querydsl.version>7.2</openfeign-querydsl.version>
 
         <!-- Database -->
         <postgresql.version>42.7.8</postgresql.version>
         <h2.version>2.2.224</h2.version>
 
-        <!-- OpenAPI/Swagger -->
-        <springdoc.version>2.5.0</springdoc.version>
-        <swagger-annotations.version>2.2.22</swagger-annotations.version>
+        <!-- OpenAPI (springdoc 3 p/ Boot 4; swagger-annotations-jakarta vem transitivo do archbase) -->
+        <springdoc.version>3.0.0</springdoc.version>
 
         <!-- JWT -->
-        <jjwt.version>0.11.5</jjwt.version>
+        <jjwt.version>0.13.0</jjwt.version>
 
         <!-- Cache -->
         <caffeine.version>3.1.8</caffeine.version>
 
         <!-- Lombok -->
-        <lombok.version>1.18.40</lombok.version>
+        <lombok.version>1.18.46</lombok.version>
 
         <!-- LangChain4j para IA (opcional) -->
-        <langchain4j.version>0.36.2</langchain4j.version>
+        <langchain4j.version>1.17.0</langchain4j.version>
     </properties>
 
     <repositories>
@@ -130,27 +130,21 @@
                 <version>${h2.version}</version>
             </dependency>
 
-            <!-- QueryDSL -->
+            <!-- QueryDSL (fork openfeign, Jakarta-native) -->
             <dependency>
-                <groupId>com.querydsl</groupId>
+                <groupId>io.github.openfeign.querydsl</groupId>
                 <artifactId>querydsl-apt</artifactId>
-                <version>${querydsl.version}</version>
+                <version>${openfeign-querydsl.version}</version>
                 <classifier>jakarta</classifier>
                 <scope>provided</scope>
             </dependency>
             <dependency>
-                <groupId>com.querydsl</groupId>
+                <groupId>io.github.openfeign.querydsl</groupId>
                 <artifactId>querydsl-jpa</artifactId>
-                <classifier>jakarta</classifier>
-                <version>${querydsl.version}</version>
+                <version>${openfeign-querydsl.version}</version>
             </dependency>
 
-            <!-- Swagger/OpenAPI -->
-            <dependency>
-                <groupId>io.swagger.core.v3</groupId>
-                <artifactId>swagger-annotations</artifactId>
-                <version>${swagger-annotations.version}</version>
-            </dependency>
+            <!-- OpenAPI (swagger-annotations-jakarta vem transitivo do archbase 3.0.0) -->
             <dependency>
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -225,9 +219,13 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.14.0</version>
                     <configuration>
                         <source>${java.version}</source>
                         <target>${java.version}</target>
+                        <release>${java.version}</release>
+                        <!-- Java 23+ não roda annotation processing implicitamente -->
+                        <proc>full</proc>
                         <annotationProcessorPaths>
                             <path>
                                 <groupId>org.projectlombok</groupId>
@@ -240,25 +238,6 @@
                                 <version>${org.mapstruct.version}</version>
                             </path>
                         </annotationProcessorPaths>
-                    </configuration>
-                </plugin>
-                <plugin>
-                    <groupId>com.querydsl</groupId>
-                    <artifactId>querydsl-maven-plugin</artifactId>
-                    <version>${querydsl.version}</version>
-                    <executions>
-                        <execution>
-                            <phase>generate-sources</phase>
-                            <goals>
-                                <goal>process</goal>
-                            </goals>
-                        </execution>
-                    </executions>
-                    <configuration>
-                        <jdbcDriver>org.postgresql.Driver</jdbcDriver>
-                        <jdbcUrl>jdbc:postgresql:localhost:5432/archbase_db</jdbcUrl>
-                        <jdbcUser>archbase</jdbcUser>
-                        <jdbcPassword>changeit</jdbcPassword>
                     </configuration>
                 </plugin>
             </plugins>

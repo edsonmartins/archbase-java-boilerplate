@@ -147,7 +147,7 @@ public class ProdutoPersistenceAdapter implements ProdutoPersistencePort {
                 .fetchOne();
 
         Long estoqueTotal = queryFactory
-                .select(qProduto.estoque.sum().longValue())
+                .select(qProduto.estoque.sumAggregate().longValue())
                 .from(qProduto)
                 .fetchOne();
 
