@@ -14,19 +14,25 @@ spring:
       enabled: true
 
   # Datasource Configuration
+  # As chaves estavam sob `spring.datasource.postgres.*`, que o Spring Boot NÃO
+  # lê e nenhum bean do Archbase consome. O efeito era silencioso: sem DataSource
+  # configurado, a aplicação subia no banco embutido — e todo o desenvolvimento
+  # acontecia contra um banco que não é o de produção.
+  #
+  # `url`, não `jdbc-url`: o segundo é nome do Hikari, e o Spring espera o
+  # primeiro em `spring.datasource`.
   datasource:
-    postgres:
-      driver-class-name: org.postgresql.Driver
-      jdbc-url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:archbase_db}
-      username: ${POSTGRES_USER:archbase}
-      password: ${POSTGRES_PASSWORD:changeit}
-      hikari:
-        maximum-pool-size: 15
-        minimum-idle: 4
-        connection-timeout: 30000
-        idle-timeout: 600000
-        max-lifetime: 1800000
-        pool-name: ArchbaseHikariPool
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:archbase_db}
+    username: ${POSTGRES_USER:archbase}
+    password: ${POSTGRES_PASSWORD:changeit}
+    hikari:
+      maximum-pool-size: 15
+      minimum-idle: 4
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: ArchbaseHikariPool
 
   # JPA Configuration
   jpa:
@@ -49,7 +55,12 @@ spring:
       javax:
         cache:
           provider: org.ehcache.jsr107.EhcacheCachingProvider
-    open-in-view: false
+    # O `archbase-security` depende do OSIV: `UserEntity.toDto()` percorre a
+    # coleção lazy `groups`, e o adapter que o chama não é transacional. Com
+    # `false`, `GET /api/v1/user/{id}` devolve 500 — e o controller do framework
+    # engole a LazyInitializationException sem log, então o servidor não registra
+    # nada e o cliente vê "500" sem corpo.
+    open-in-view: true
 
   # Cache Configuration
   cache:
@@ -59,6 +70,20 @@ spring:
 
   # Redis Configuration
   data:
+    # -------------------------------------------------------------------------
+    # Spring Data REST: detecção apenas do que for anotado.
+    #
+    # O starter entra por causa do springdoc, e a estratégia PADRÃO publica CRUD
+    # HTTP para todo repositório público — inclusive os do archbase-security, com
+    # o de token de API entre eles. Seriam escritas diretas no banco, por fora
+    # dos serviços e das suas validações.
+    #
+    # `annotated` exige `@RepositoryRestResource` explícito. Sem anotação, nada
+    # é publicado.
+    # -------------------------------------------------------------------------
+    rest:
+      detection-strategy: annotated
+
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}

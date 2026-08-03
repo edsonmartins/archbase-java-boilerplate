@@ -1,0 +1,28 @@
+# ============================================
+# ARCHBASE BOILERPLATE - H2 EM MEMÓRIA
+# ============================================
+#
+# Perfil de conveniência, para rodar sem infraestrutura. **Escolha consciente**:
+#
+#     mvn spring-boot:run -Dspring-boot.run.profiles=h2
+#
+# Não use como padrão de desenvolvimento. O H2 não é o banco de produção: difere
+# em tipo, em DDL e não implementa `jsonb`. Um projeto desenvolvido aqui descobre
+# a diferença tarde, e o teste que passa em H2 e falha em PostgreSQL é pior que
+# teste nenhum — ele dá confiança falsa.
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:archbasedb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: update
