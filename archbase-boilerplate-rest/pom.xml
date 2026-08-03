@@ -40,6 +40,44 @@
             <artifactId>spring-boot-starter-jetty</artifactId>
         </dependency>
 
+        <!--
+          O `spring-hateoas` entra transitivamente pelo Archbase, e o springdoc
+          ativa a autoconfiguração de HATEOAS — que no Spring Boot 4 mora em
+          módulo próprio. Sem este starter a aplicação não sobe:
+
+            TypeNotPresentException: org.springframework.boot.hateoas.autoconfigure.HateoasProperties
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-hateoas</artifactId>
+        </dependency>
+
+        <!--
+          Mesma história com o Data REST: vem transitivo pelo Archbase, que usa
+          `RepositoryRestConfigurer`, e o springdoc exige a autoconfiguração.
+
+          A estratégia de detecção fica em `annotated` no application.yml — o
+          padrão publicaria CRUD HTTP para TODO repositório público, escrevendo
+          entidade direto no banco por fora dos serviços.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-rest</artifactId>
+        </dependency>
+
+        <!--
+          OBRIGATÓRIO com `server.http2.enabled: true` no application.yml.
+
+          O `spring-boot-starter-jetty` NÃO traz o módulo HTTP/2, e o Jetty o exige
+          para configurar h2c. Sem ele a aplicação morre no boot com
+          NoClassDefFoundError: org/eclipse/jetty/http2/server/HTTP2CServerConnectionFactory
+          — e o erro não menciona a dependência que falta.
+        -->
+        <dependency>
+            <groupId>org.eclipse.jetty.http2</groupId>
+            <artifactId>jetty-http2-server</artifactId>
+        </dependency>
+
         <!-- Spring Boot Security -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -104,6 +142,29 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!--
+              Failsafe: sem ele, teste de integração terminado em `IT` NUNCA RODA.
+
+              O Surefire só reconhece `*Test`. Um `*IT` sem este plugin passa
+              despercebido e o build fica verde sem ter executado nada — a pior
+              forma de falso positivo, porque a suíte parece cobrir e não cobre.
+
+              `mvn test`   = o que não precisa de infraestrutura.
+              `mvn verify` = acrescenta o que exige banco.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -14,8 +14,21 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class WebClientConfig {
 
+    /**
+     * O parâmetro {@code WebClient.Builder} foi removido.
+     *
+     * <p>Ele era exigido por injeção e <b>nunca usado</b> — o corpo chama
+     * {@code WebClient.builder()} direto. Como esse bean só existe com a
+     * autoconfiguração do WebFlux, que um projeto servlet não traz, a aplicação
+     * inteira não subia:
+     *
+     * <pre>NoSuchBeanDefinitionException: No qualifying bean of type '...WebClient$Builder'</pre>
+     *
+     * <p>Um parâmetro não usado derrubando a aplicação é o pior tipo de
+     * acoplamento: nem o compilador nem a leitura do corpo denunciam.
+     */
     @Bean
-    public WebClient webClient(WebClient.Builder builder) {
+    public WebClient webClient() {
         return WebClient.builder()
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8")
                 .build();

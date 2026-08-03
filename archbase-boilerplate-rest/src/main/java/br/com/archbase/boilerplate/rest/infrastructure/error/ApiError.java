@@ -100,6 +100,26 @@ public class ApiError {
         globalErrors.forEach(this::addValidationError);
     }
 
+    /**
+     * Nome do campo que violou a restrição — o último nó do caminho.
+     *
+     * <p>Antes era um cast para {@code PathImpl}, do pacote {@code internal} do
+     * Hibernate Validator. Depender de `internal` é contrato que ninguém prometeu
+     * manter: a classe muda de lugar entre versões e o projeto para de compilar
+     * numa atualização que deveria ser transparente.
+     *
+     * <p>{@code Path.Node#toString()} já rende `itens[2]` e `mapa[chave]` — usar
+     * só `getName()` devolveria `itens`, e uma violação no terceiro elemento
+     * ficaria indistinguível de uma no primeiro.
+     */
+    private static String nomeDoCampo(ConstraintViolation<?> cv) {
+        jakarta.validation.Path.Node folha = null;
+        for (jakarta.validation.Path.Node no : cv.getPropertyPath()) {
+            folha = no;
+        }
+        return folha == null ? "" : folha.toString();
+    }
+
     private void addValidationError(ConstraintViolation<?> cv) {
         this.addValidationError(
                 cv.getRootBeanClass().getSimpleName(),

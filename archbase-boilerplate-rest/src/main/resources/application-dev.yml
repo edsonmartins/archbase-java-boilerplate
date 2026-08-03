@@ -12,18 +12,17 @@ spring:
         show_sql: true
         format_sql: true
 
-  # H2 Console para testes sem PostgreSQL
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
-
-  # Datasource H2 para testes locais (quando PostgreSQL não está disponível)
-  datasource:
-    url: jdbc:h2:mem:archbasedb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+# O datasource vem de `application.yml`: PostgreSQL, o mesmo do docker-compose.
+#
+# O H2 saiu daqui e virou o perfil `h2`, que se escolhe de propósito. Antes ele
+# estava no perfil DEFAULT, e o efeito era mudo: o desenvolvedor subia o
+# PostgreSQL pelo docker-compose, lia a configuração de PostgreSQL no
+# application.yml, e a aplicação rodava em banco de memória. Com `ddl-auto:
+# update`, o schema nascia do Hibernate sobre um banco que não é o de produção, e
+# a diferença — tipo, DDL, `jsonb` — só aparecia em homologação.
+#
+# Para usar H2 conscientemente:
+#     mvn spring-boot:run -Dspring-boot.run.profiles=h2
 
 # Logging detalhado para desenvolvimento
 logging:
