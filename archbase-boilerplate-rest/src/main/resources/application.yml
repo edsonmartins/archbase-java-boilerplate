@@ -104,19 +104,13 @@ server:
   http2:
     enabled: true
 
-# Application Configuration
-application:
-  security:
-    jwt:
-      secret-key: ${ARCHBASE_JWT_SECRET:change-this-secret-key-in-production}
-      expiration: 86400000
-      refresh-token:
-        expiration: 604800000
-    cors:
-      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200}
-      allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
-      allowed-headers: Authorization,Content-Type,Accept,X-Requested-With,X-Device-ID,X-App-Version,X-TENANT-ID,X-Tenant-Id
-      allow-credentials: true
+# O bloco "application.security" foi REMOVIDO. Ele duplicava, com outro nome, o que o framework já
+# lê em "archbase.security" logo abaixo:
+#   - application.security.jwt.*  -> ninguém lia. Trocar o segredo ali não trocava segredo nenhum.
+#   - application.security.cors.* -> alimentava um segundo filtro de CORS, próprio do boilerplate,
+#     que competia com o do framework. Duas fontes para a mesma regra divergem no primeiro dia em
+#     que alguém edita só uma delas.
+# Agora há uma fonte só: archbase.security.
 
 # OpenAPI Configuration
 openapi:
