@@ -117,6 +117,14 @@
                 <artifactId>archbase-starter</artifactId>
                 <version>${archbase.version}</version>
             </dependency>
+            <!-- Acrescenta às locations do Flyway o diretório onde os módulos do framework publicam
+                 a evolução dos próprios schemas (migrations R__, idempotentes). É o que faz uma
+                 coluna nova do Archbase chegar sem ninguém precisar descobri-la em runtime. -->
+            <dependency>
+                <groupId>br.com.archbase</groupId>
+                <artifactId>archbase-starter-flyway</artifactId>
+                <version>${archbase.version}</version>
+            </dependency>
 
             <!-- Database -->
             <dependency>

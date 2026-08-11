@@ -36,6 +36,22 @@
             <artifactId>archbase-starter</artifactId>
         </dependency>
 
+        <!-- Flyway: o schema é versionado, não gerado pelo Hibernate. Em produção o ddl-auto é
+             'validate', então algo precisa criar as tabelas antes — inclusive as de segurança do
+             framework, que uma versão nova pode acrescentar. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>br.com.archbase</groupId>
+            <artifactId>archbase-starter-flyway</artifactId>
+        </dependency>
+
         <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>
