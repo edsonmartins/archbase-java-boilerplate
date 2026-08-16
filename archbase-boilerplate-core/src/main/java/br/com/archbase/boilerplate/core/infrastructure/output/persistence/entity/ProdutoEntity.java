@@ -75,7 +75,22 @@ public class ProdutoEntity extends TenantPersistenceEntityBase {
                          String nome, String descricao, BigDecimal preco, Integer estoque,
                          CategoriaProduto categoria, Boolean ativo, String sku, LocalDateTime dataCadastro,
                          Boolean destaque, String urlImagem, String marca) {
-        super(id, code, version, createEntityDate, createdByUser, updateEntityDate, lastModifiedByUser, tenantId);
+        // O id é gerado aqui quando não vem informado. Quem chama o builder para criar um produto
+        // novo não tem id a oferecer, e as bases do archbase só geram UUID no construtor SEM
+        // argumentos — este, que repassa o id ao super, entregava null. O efeito era que criar
+        // produto pelo POST falhava com "Identifier of entity ... must be manually assigned before
+        // calling 'persist()'", ou seja, o CRUD de exemplo do boilerplate não funcionava.
+        //
+        // Gerar aqui, e não no serviço, mantém a regra num lugar só: são cinco pontos de save() no
+        // ProdutoService, e o próximo CRUD copiado deste exemplo herdaria o mesmo defeito.
+        // createEntityDate pelo mesmo motivo: sem isto, todo produto criado pelo POST era gravado
+        // com a data de criação vazia, enquanto createdByUser vinha preenchido pelo AuditingEntityListener.
+        // As datas do archbase são preenchidas por construtor, não por @CreatedDate — decisão
+        // documentada na PersistenceEntityBase —, e esta sobrecarga não passa por lá.
+        super(id != null ? id : java.util.UUID.randomUUID().toString(),
+                code, version,
+                createEntityDate != null ? createEntityDate : LocalDateTime.now(),
+                createdByUser, updateEntityDate, lastModifiedByUser, tenantId);
         this.nome = nome;
         this.descricao = descricao;
         this.preco = preco;

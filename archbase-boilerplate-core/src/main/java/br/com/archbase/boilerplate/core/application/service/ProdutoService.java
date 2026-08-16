@@ -112,6 +112,12 @@ public class ProdutoService {
         if (dto.getUrlImagem() != null) entity.setUrlImagem(dto.getUrlImagem());
         if (dto.getDestaque() != null) entity.setDestaque(dto.getDestaque());
 
+        // As datas do archbase são preenchidas por construtor, não por @LastModifiedDate — decisão
+        // documentada na PersistenceEntityBase. Quem altera precisa marcar a data explicitamente;
+        // sem isto, updateEntityDate ficava nulo em todo registro alterado, enquanto o
+        // lastModifiedByUser vinha preenchido pelo AuditingEntityListener.
+        entity.setUpdateEntityDate(LocalDateTime.now());
+
         ProdutoEntity saved = repository.save(entity);
         log.info("Produto atualizado: {}", saved.getId());
 

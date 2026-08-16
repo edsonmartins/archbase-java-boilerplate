@@ -1,23 +1,23 @@
 # Archbase Java Boilerplate
 
-> Boilerplate para criação de projetos backend Java com Spring Boot 3 e Archbase Framework v2.1
+> Boilerplate para criação de projetos backend Java com Spring Boot 4 e Archbase Framework 3
 
-[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.6-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Archbase](https://img.shields.io/badge/Archbase-2.1.15-blue.svg)](https://github.com/edsonmartins/archbase-app-framework)
+[![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Archbase](https://img.shields.io/badge/Archbase-3.2.0-blue.svg)](https://github.com/edsonmartins/archbase-app-framework)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
 ## Características
 
-- **[Spring Boot 3.5.6](https://spring.io/projects/spring-boot)** - Framework web com suporte a Jakarta EE
-- **[Java 21](https://openjdk.org/projects/jdk/21/)** - LTS com Virtual Threads (Project Loom)
-- **[Archbase Framework 2.1.15](https://github.com/edsonmartins/archbase-app-framework)** - Framework DDD brasileiro completo
-- **[QueryDSL 5.1.0](https://querydsl.com/)** - Queries tipo-safe com JPA
+- **[Spring Boot 4.1.0](https://spring.io/projects/spring-boot)** - Framework web com suporte a Jakarta EE
+- **[Java 25](https://openjdk.org/projects/jdk/25/)** - LTS com Virtual Threads (Project Loom)
+- **[Archbase Framework 3.2.0](https://github.com/edsonmartins/archbase-app-framework)** - Framework DDD brasileiro completo
+- **[QueryDSL 7.2](https://querydsl.com/)** - Queries tipo-safe com JPA (fork openfeign, Jakarta-native)
 - **Arquitetura Hexagonal** - Ports e Adapters (limpa e testável)
 - **Multi-tenancy** - Suporte nativo a múltiplos tenants
-- **Virtual Threads** - Concorrência escalável com Java 21
+- **Virtual Threads** - Concorrência escalável com Java 25
 - **PostgreSQL 16** - Banco de dados principal
 - **Flyway** - Migrations de banco de dados versionadas
 - **H2** - Para desenvolvimento e testes
@@ -33,17 +33,17 @@
 
 | Tecnologia | Versão | Descrição |
 |------------|--------|-----------|
-| Java | 21 | LTS com Virtual Threads |
-| Spring Boot | 3.5.6 | Framework principal |
-| Archbase Framework | 2.1.15 | DDD, Security, Multitenancy |
-| QueryDSL | 5.1.0 | Queries tipo-safe |
+| Java | 25 | LTS com Virtual Threads |
+| Spring Boot | 4.1.0 | Framework principal |
+| Archbase Framework | 3.2.0 | DDD, Security, Multitenancy |
+| QueryDSL | 7.2 | Queries tipo-safe (fork openfeign) |
 | PostgreSQL | 16 | Banco de dados |
 | Flyway | 10.15.0 | Migrations |
 | H2 | 2.2.224 | Desenvolvimento |
-| MapStruct | 1.5.5.Final | Mapeamento |
-| Lombok | 1.18.40 | Boilerplate |
-| Springdoc OpenAPI | 2.8.5 | Documentação |
-| Undertow | - | Servlet container |
+| MapStruct | 1.6.3 | Mapeamento |
+| Lombok | 1.18.46 | Boilerplate |
+| Springdoc OpenAPI | 3.0.0 | Documentação (linha 3 p/ Boot 4) |
+| Jetty | - | Servlet container (o starter-tomcat é excluído) |
 | JUnit 5 | - | Testes |
 | Mockito | - | Mocks para testes |
 
@@ -103,7 +103,7 @@ archbase-java-boilerplate/
 
 ## Pré-requisitos
 
-- **Java 21+** - [Download](https://adoptium.net/)
+- **Java 25+** - [Download](https://adoptium.net/)
 - **Maven 3.8+** - [Download](https://maven.apache.org/download.cgi)
 - **Docker** - [Download](https://www.docker.com/products/docker-desktop)
 - IDE recomendado: **IntelliJ IDEA**
@@ -182,9 +182,15 @@ ARCHBASE_DEFAULT_TENANT_ID=a9f814d2-4dae-41f3-851b-8aa3d4706561
 
 ### Profiles
 
-- **dev** - Desenvolvimento com H2 em memória e DataSeedLoader
-- **homolog** - Homologação com PostgreSQL
-- **prod** - Produção com PostgreSQL e configurações seguras
+- **dev** - Desenvolvimento com PostgreSQL (`docker-compose up -d postgres`), `ddl-auto: update` e o
+  seed que cria o primeiro administrador — `admin@archbase.com.br` / `admin`. Em qualquer outro
+  perfil a senha é aleatória; para escolhê-la, defina `archbase.boilerplate.seed.admin.password`.
+- **h2** - Desenvolvimento sem Docker, com H2 em memória
+- **homolog** - Homologação com PostgreSQL e `ddl-auto: update`
+- **prod** - Produção com PostgreSQL, Flyway como dono do schema e `ddl-auto: validate`
+
+> A aplicação **recusa-se a subir** enquanto `ARCHBASE_JWT_SECRET` for o texto de exemplo: ele
+> precisa ser Base64 válido. Gere o seu com `openssl rand -base64 48`.
 
 ```bash
 # Desenvolvimento
@@ -194,7 +200,7 @@ java -jar app.jar --spring.profiles.active=dev
 java -jar app.jar --spring.profiles.active=prod
 ```
 
-### Virtual Threads (Java 21)
+### Virtual Threads (Java 25)
 
 Virtual Threads estão habilitados por padrão no `application.yml`:
 

@@ -31,7 +31,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Archbase Framework -->
-        <archbase.version>3.1.22</archbase.version>
+        <archbase.version>3.2.0</archbase.version>
 
         <!-- MapStruct -->
         <org.mapstruct.version>1.6.3</org.mapstruct.version>
