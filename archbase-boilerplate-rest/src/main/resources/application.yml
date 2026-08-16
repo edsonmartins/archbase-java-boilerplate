@@ -104,19 +104,13 @@ server:
   http2:
     enabled: true
 
-# Application Configuration
-application:
-  security:
-    jwt:
-      secret-key: ${ARCHBASE_JWT_SECRET:change-this-secret-key-in-production}
-      expiration: 86400000
-      refresh-token:
-        expiration: 604800000
-    cors:
-      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200}
-      allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
-      allowed-headers: Authorization,Content-Type,Accept,X-Requested-With,X-Device-ID,X-App-Version,X-TENANT-ID,X-Tenant-Id
-      allow-credentials: true
+# O bloco "application.security" foi REMOVIDO. Ele duplicava, com outro nome, o que o framework já
+# lê em "archbase.security" logo abaixo:
+#   - application.security.jwt.*  -> ninguém lia. Trocar o segredo ali não trocava segredo nenhum.
+#   - application.security.cors.* -> alimentava um segundo filtro de CORS, próprio do boilerplate,
+#     que competia com o do framework. Duas fontes para a mesma regra divergem no primeiro dia em
+#     que alguém edita só uma delas.
+# Agora há uma fonte só: archbase.security.
 
 # OpenAPI Configuration
 openapi:
@@ -139,6 +133,17 @@ archbase:
     tenant:
       default:
         id: ${ARCHBASE_DEFAULT_TENANT_ID:a9f814d2-4dae-41f3-851b-8aa3d4706561}
+      # X-TENANT-ID por query string vaza em log de proxy e no Referer, do mesmo jeito que o token.
+      # O cabeçalho continua valendo.
+      accept-query-param: false
+      # fail-on-missing fica FALSE aqui porque este boilerplate define um tenant padrão logo acima:
+      # com ele configurado, requisição sem tenant cai no padrão em vez de ser recusada, que é o
+      # comportamento desejado num ponto de partida de projeto.
+      #
+      # Se o seu produto for multi-tenant de verdade, remova o tenant padrão e ligue esta flag: sem
+      # as duas coisas juntas, um pedido sem tenant no contexto lê e escreve no tenant padrão em
+      # silêncio — que é como dado de um cliente acaba no outro.
+      fail-on-missing: false
     jpa:
       repositories: br.com.archbase.boilerplate.core.infrastructure.output.persistence.repository
       entities: br.com.archbase.boilerplate.core.infrastructure.output.persistence.entity
@@ -149,8 +154,103 @@ archbase:
       secret-key: ${ARCHBASE_JWT_SECRET:change-this-secret-key-in-production}
       token-expiration: 86400000
       refresh-expiration: 604800000
+      # Recusa token sem o claim token_use, que distingue access de refresh. Num projeto já em
+      # produção isto só pode ser ligado depois que o maior refresh-expiration tiver passado desde o
+      # deploy, senão os tokens emitidos antes deixam de valer; aqui não há token algum emitido.
+      strict-token-use: true
+      # Credencial em query string (?token=) aparece em log de proxy, histórico de navegador e no
+      # cabeçalho Referer. Existia só por compatibilidade.
+      accept-token-query-param: false
     scan-packages: br.com.archbase.boilerplate.rest.infrastructure.input.rest
-    whitelist: /actuator/**,/swagger-ui/**,/v3/api-docs/**,/api/v1/public/**
+    # /actuator/health fica aberto porque liveness e readiness de container precisam dele sem
+    # credencial; o resto do actuator (metrics, info) exige autenticação. Antes a whitelist trazia
+    # /actuator/** inteiro.
+    whitelist: /actuator/health,/swagger-ui/**,/v3/api-docs/**,/api/v1/public/**
+
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+    # Endurecimento
+    #
+    # Os defaults destas flags no framework são PERMISSIVOS de propósito: elas nasceram de uma
+    # auditoria e precisavam não derrubar backends já em produção na hora de atualizar. Este
+    # boilerplate é ponto de partida de projeto NOVO, que não tem legado nenhum a preservar — aqui
+    # elas já vêm no valor endurecido, e quem herda este arquivo herda o comportamento seguro.
+    #
+    # Antes de afrouxar qualquer uma, vale exercitar o caminho de um usuário NÃO-administrador.
+    # ─────────────────────────────────────────────────────────────────────────────────────────
+
+    # Resposta uniforme no fluxo de recuperação de senha: sem isto, a diferença entre "e-mail
+    # enviado" e "usuário não encontrado" permite enumerar quem tem conta. Se o frontend exibia a
+    # mensagem específica, ele precisa passar a exibir a genérica.
+    prevent-user-enumeration: true
+
+    # Trocar a senha encerra as outras sessões. É o que se espera depois de um vazamento.
+    password-change:
+      revoke-sessions: true
+
+    require-role:
+      # Sem um ArchbaseRoleResolver registrado, @RequireRole não tem como avaliar nada: 'deny' nega,
+      # 'permit' deixa passar. Este boilerplate não usa @RequireRole nem registra resolver, então a
+      # opção segura não custa nada hoje — e protege quem adicionar a anotação amanhã sem lembrar
+      # do resolver.
+      no-resolver-policy: deny
+
+    public-paths:
+      # O actuator é tratado pela whitelist acima, com /actuator/health aberto e o resto fechado.
+      actuator: false
+      # Auto-cadastro anônimo desligado: num produto que não é de cadastro aberto, isto é uma porta
+      # para criar conta sem convite. Ligue se o seu for.
+      registration: false
+      # Rotas de aplicação legadas, mantidas no framework só por compatibilidade.
+      legacy-app-routes: false
+
+    admin-guard:
+      # Trava contra criação e promoção de administrador por quem não é administrador.
+      enabled: true
+      allow-unverifiable-principal: false
+
+    # POLÍTICA DE ADMIN-ENDPOINTS: fica em 'permit' DE PROPÓSITO, e não por esquecimento.
+    #
+    # 'admin-only' é o valor seguro, mas hoje ele é incompatível com o archbase-react: o
+    # ArchbaseSecurityManager registra os recursos declarados em cada view chamando
+    # POST /api/v1/resource/register ao ABRIR CADA TELA, com o usuário que estiver logado. Esse
+    # endpoint é administrativo pela marcação do framework, então 'admin-only' devolve 403 em toda
+    # tela para todo não-administrador. Foi ligado em produção no gestor-rq em 09/08/2026 e teve de
+    # ser revertido no mesmo dia.
+    #
+    # Enquanto o auto-registro não tiver política própria — é declaração de catálogo, não concessão
+    # de permissão —, isto permanece 'permit'. A consequência a conhecer: qualquer usuário
+    # autenticado alcança os endpoints administrativos, incluindo POST /api/v1/user. Se o seu
+    # projeto NÃO usa archbase-react, mude para 'admin-only'.
+    admin-endpoints:
+      policy: permit
+
+    api-token:
+      # Tokens de API são gravados como hash.
+      hash-enabled: true
+      # purge-plaintext apaga o valor em claro dos tokens já existentes e é IRREVERSÍVEL. Num
+      # projeto novo não há o que apagar; deixe como está até ter tokens emitidos por uma versão
+      # que já grave hash, e então ligue num segundo deploy.
+      purge-plaintext: false
+
+    client-ip:
+      # Só ligue se houver um proxy à frente que SOBRESCREVA o X-Forwarded-For. Sem esse proxy, o
+      # atacante troca de identidade a cada requisição e ainda bloqueia terceiros forjando o
+      # endereço deles — o rate limit vira arma.
+      trust-forwarded-for: false
+
+    password:
+      # Política de força: os defaults do framework vêm todos desligados (min-length=0).
+      min-length: 12
+      require-digit: true
+      require-uppercase: true
+      require-lowercase: true
+      require-special: true
+      block-common: true
+
+    # Recusa subir se alguma proteção habilitada acima não puder funcionar, em vez de seguir com
+    # ela silenciosamente inerte.
+    hardening:
+      validation: fail
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200}
       allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS

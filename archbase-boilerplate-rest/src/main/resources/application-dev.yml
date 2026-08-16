@@ -3,7 +3,19 @@
 # ============================================
 
 spring:
-  # JPA para desenvolvimento
+  # Flyway também em desenvolvimento, e de propósito: se o schema só for exercitado em produção, a
+  # migration quebrada só aparece lá. Aqui ela quebra na máquina de quem a escreveu.
+  flyway:
+    enabled: ${APP_FLYWAY_ENABLED:true}
+    baseline-on-migrate: true
+    baseline-version: 0
+
+  # JPA para desenvolvimento.
+  #
+  # ddl-auto continua 'update' aqui por conveniência — mexer numa entidade e ver a coluna aparecer
+  # sem escrever migration acelera o começo. O preço é que o banco de desenvolvimento diverge do que
+  # as migrations produzem, e ninguém percebe. Ao criar uma entidade nova, escreva a migration e
+  # troque para 'validate' localmente ao menos uma vez, para conferir que ela basta.
   jpa:
     hibernate:
       ddl-auto: update

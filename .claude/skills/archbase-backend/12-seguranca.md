@@ -7,11 +7,70 @@ Anotações de segurança do Archbase Framework.
 ## Conceito
 
 **CRÍTICO**: Use SEMPRE anotações Archbase, NUNCA Spring Security:
-- `@RequireRole` - Roles do sistema
+- `@HasPermission` - **a principal**: exige uma ação sobre um recurso
+- `@RequireRole` - Roles do sistema (leia a ressalva abaixo antes de usar)
 - `@RequireProfile` - Perfis de acesso
 - `@RequirePersona` - Personas em contexto
 
 **PROIBIDO**: `@PreAuthorize`, `@Secured`, `@RolesAllowed`
+
+---
+
+## ⚠️ Leia antes de usar `@RequireRole`
+
+**`@RequireRole` não protege nada sozinho.** As roles que ele confere pertencem ao domínio da
+aplicação, não ao Archbase — o framework não sabe o que é "ADMIN" no seu sistema. Para a anotação
+decidir alguma coisa, a aplicação precisa registrar um bean `ArchbaseRoleResolver`.
+
+**Sem esse bean, quem decide é uma chave cujo padrão é liberar:**
+
+```yaml
+archbase:
+  security:
+    require-role:
+      no-resolver-policy: permit   # padrão: passa. Use 'deny' para negar.
+```
+
+Ou seja: anotar um endpoint com `@RequireRole("ADMIN")` num projeto sem resolver o deixa **aberto a
+qualquer autenticado**, sem erro nem aviso. O código parece protegido e não está.
+
+Duas saídas, nesta ordem de preferência:
+
+1. **Use `@HasPermission`** (abaixo). Ele funciona com o modelo de permissões do próprio Archbase e
+   não depende de bean nenhum da aplicação.
+2. Se precisar mesmo de roles, **registre o `ArchbaseRoleResolver`** e considere
+   `no-resolver-policy: deny`, para que a ausência do bean falhe alto em vez de liberar em silêncio.
+
+---
+
+## @HasPermission — o caminho padrão
+
+Exige uma **ação** sobre um **recurso**, que é como o Archbase modela permissão. Não depende de nada
+que a aplicação precise implementar.
+
+```java
+import br.com.archbase.security.annotation.HasPermission;   // 'annotation', no singular
+
+@RestController
+@RequestMapping("/api/v1/pedidos")
+public class PedidoController {
+
+    @GetMapping
+    @HasPermission(action = "VIEW", resource = "PEDIDO", description = "Listar pedidos")
+    public ResponseEntity<List<PedidoDto>> listar() { ... }
+
+    @PostMapping
+    @HasPermission(action = "CREATE", resource = "PEDIDO", description = "Criar pedido")
+    public ResponseEntity<PedidoDto> criar(@RequestBody PedidoDto dto) { ... }
+}
+```
+
+**Só em método.** `@HasPermission` é `@Target(METHOD)` — não compila na classe. As outras três
+aceitam classe, e nesse caso valem para todos os métodos, com a anotação de método sobrescrevendo a
+da classe.
+
+Repare no pacote: `@HasPermission` está em `...security.annotation` (singular) e as outras três em
+`...security.annotations` (plural). É fácil errar o import e não entender por que não compila.
 
 ---
 
@@ -165,6 +224,38 @@ archbase:
       allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
       allowed-headers: Authorization,Content-Type,Accept
 ```
+
+**CORS tem uma fonte só.** É esta. Não crie um `CorsFilter` na aplicação: ele competiria com o do
+framework, e duas regras para a mesma coisa divergem no primeiro dia em que alguém edita só uma.
+
+### Chaves que costumam ser esquecidas
+
+```yaml
+archbase:
+  security:
+    # Confere o esquema de segurança na subida e cria o que falta (tabelas e colunas que uma versão
+    # nova do framework passou a exigir). Só comandos aditivos; nunca remove nada.
+    schema:
+      mode: apply          # apply | report | off
+    # Tela de diagnóstico de acesso: árvore de quem tem o quê, panorama e simulação.
+    # SEM esta chave o controller nem é registrado e a tela responde 404 — não 403.
+    diagnostics:
+      enabled: true
+    # Trilha de auditoria: quem alterou permissão, quem entrou, quem teve acesso negado.
+    # Ligue DEPOIS de garantir que as tabelas existem (ver abaixo).
+    audit:
+      enabled: false
+```
+
+### Se o projeto sobe com `hibernate.ddl-auto: validate`
+
+Duas tabelas precisam existir **antes** do boot, mesmo com a trilha desligada: `seguranca_evento` e
+`seguranca_revisao`. São entidades JPA comuns, então o Hibernate as exige na validação — e a rotina
+de `schema.mode` não ajuda aqui, porque roda **depois** que o `EntityManagerFactory` sobe.
+
+Sintoma: `Schema validation: missing table [seguranca_evento]`, e a aplicação não sobe.
+
+O DDL está em `deployment/sql/` no repositório do framework.
 
 ---
 

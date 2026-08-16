@@ -31,7 +31,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Archbase Framework -->
-        <archbase.version>3.0.1</archbase.version>
+        <archbase.version>3.2.1</archbase.version>
 
         <!-- MapStruct -->
         <org.mapstruct.version>1.6.3</org.mapstruct.version>
@@ -115,6 +115,14 @@
             <dependency>
                 <groupId>br.com.archbase</groupId>
                 <artifactId>archbase-starter</artifactId>
+                <version>${archbase.version}</version>
+            </dependency>
+            <!-- Acrescenta às locations do Flyway o diretório onde os módulos do framework publicam
+                 a evolução dos próprios schemas (migrations R__, idempotentes). É o que faz uma
+                 coluna nova do Archbase chegar sem ninguém precisar descobri-la em runtime. -->
+            <dependency>
+                <groupId>br.com.archbase</groupId>
+                <artifactId>archbase-starter-flyway</artifactId>
                 <version>${archbase.version}</version>
             </dependency>
 

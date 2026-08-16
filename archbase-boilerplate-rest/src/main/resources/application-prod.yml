@@ -3,6 +3,17 @@
 # ============================================
 
 spring:
+  # Flyway é o dono do schema em produção. O Hibernate apenas CONFERE (ddl-auto: validate) e recusa
+  # subir se algo não bater — em vez de alterar o banco por conta própria.
+  #
+  # baseline-on-migrate cobre a adoção sobre banco que já existe: sem ele, o Flyway se recusa a rodar
+  # num schema não-vazio. Com baseline-version=0, a V1 executa mesmo assim; num banco que já tinha as
+  # tabelas, remova o V1 ou ajuste a baseline conforme o caso.
+  flyway:
+    enabled: ${APP_FLYWAY_ENABLED:true}
+    baseline-on-migrate: true
+    baseline-version: 0
+
   # JPA para produção
   jpa:
     hibernate:

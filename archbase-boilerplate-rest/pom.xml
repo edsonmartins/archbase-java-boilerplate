@@ -22,6 +22,15 @@
             <artifactId>archbase-boilerplate-core</artifactId>
         </dependency>
 
+        <!-- Actuator. O application.yml ja configurava `management.endpoints`, a whitelist de
+             seguranca ja liberava /actuator e o README ja anunciava o health check, mas a
+             dependencia nao estava declarada: /actuator/health respondia 404. Liveness e readiness
+             de container dependem dele. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- Spring Boot Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
