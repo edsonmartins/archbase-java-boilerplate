@@ -4,7 +4,7 @@
 
 [![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
-[![Archbase](https://img.shields.io/badge/Archbase-3.2.1-blue.svg)](https://github.com/edsonmartins/archbase-app-framework)
+[![Archbase](https://img.shields.io/badge/Archbase-3.2.2-blue.svg)](https://github.com/edsonmartins/archbase-app-framework)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -13,7 +13,7 @@
 
 - **[Spring Boot 4.1.0](https://spring.io/projects/spring-boot)** - Framework web com suporte a Jakarta EE
 - **[Java 25](https://openjdk.org/projects/jdk/25/)** - LTS com Virtual Threads (Project Loom)
-- **[Archbase Framework 3.2.1](https://github.com/edsonmartins/archbase-app-framework)** - Framework DDD brasileiro completo
+- **[Archbase Framework 3.2.2](https://github.com/edsonmartins/archbase-app-framework)** - Framework DDD brasileiro completo
 - **[QueryDSL 7.2](https://querydsl.com/)** - Queries tipo-safe com JPA (fork openfeign, Jakarta-native)
 - **Arquitetura Hexagonal** - Ports e Adapters (limpa e testável)
 - **Multi-tenancy** - Suporte nativo a múltiplos tenants
@@ -35,7 +35,7 @@
 |------------|--------|-----------|
 | Java | 25 | LTS com Virtual Threads |
 | Spring Boot | 4.1.0 | Framework principal |
-| Archbase Framework | 3.2.1 | DDD, Security, Multitenancy |
+| Archbase Framework | 3.2.2 | DDD, Security, Multitenancy |
 | QueryDSL | 7.2 | Queries tipo-safe (fork openfeign) |
 | PostgreSQL | 16 | Banco de dados |
 | Flyway | 10.15.0 | Migrations |
