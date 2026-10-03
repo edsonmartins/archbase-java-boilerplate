@@ -138,9 +138,8 @@ public class ProdutoEntity extends TenantPersistenceEntityBase {
   manually assigned before calling 'persist()'"*.
 - As datas do Archbase são preenchidas por construtor, **não** por `@CreatedDate`/`@LastModifiedDate`.
   Quem atualiza deve fazer `entity.setUpdateEntityDate(LocalDateTime.now())` (o `ProdutoService` faz).
-- Observação sobre o código atual: `toDTO()`/`fromDTO()` **não mapeiam** `marca`, `urlImagem` e
-  `destaque` (os campos existem na entidade e no DTO, e o `criar(ProdutoCreateDTO)` os grava, mas a
-  resposta `ProdutoDTO` volta sem eles). Ao copiar o padrão, mapeie todos os campos.
+- `toDTO()`/`fromDTO()` devem mapear todos os campos da entidade; ao adicionar um campo, atualize os dois
+  métodos (o `ProdutoEntityTest` cobre a ida e volta de `marca`, `urlImagem` e `destaque`).
 
 ---
 

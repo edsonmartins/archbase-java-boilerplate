@@ -124,6 +124,9 @@ public class ProdutoEntity extends TenantPersistenceEntityBase {
                 .ativo(dto.getAtivo())
                 .sku(dto.getSku())
                 .dataCadastro(dto.getDataCadastro())
+                .destaque(dto.getDestaque())
+                .urlImagem(dto.getUrlImagem())
+                .marca(dto.getMarca())
                 .build();
     }
 
@@ -145,6 +148,9 @@ public class ProdutoEntity extends TenantPersistenceEntityBase {
                 .ativo(ativo)
                 .sku(sku)
                 .dataCadastro(dataCadastro)
+                .destaque(destaque)
+                .urlImagem(urlImagem)
+                .marca(marca)
                 .build();
     }
 }

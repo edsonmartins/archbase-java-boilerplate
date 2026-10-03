@@ -136,8 +136,8 @@ Detalhes a conhecer:
 - `@Builder` no construtor com argumentos da base é o que permite `ProdutoEntity.builder()...build()` (usado no
   `ProdutoService.criar`). Ao criar nova entidade a partir deste exemplo, mantenha a geração de `id` e
   `createEntityDate` nesse construtor.
-- `fromDTO()` e `toDTO()` hoje não copiam `destaque`, `urlImagem` e `marca` (só os demais campos); `toDTO()` usa
-  `getTenantId()`.
+- `fromDTO()` e `toDTO()` copiam todos os campos, inclusive `destaque`, `urlImagem` e `marca` (coberto por
+  `ProdutoEntityTest`); `toDTO()` usa `getTenantId()`. Ao adicionar campo, atualize os dois métodos.
 - `updateEntityDate` não é preenchido automaticamente: o `ProdutoService.atualizar` faz
   `entity.setUpdateEntityDate(LocalDateTime.now())`.
 
