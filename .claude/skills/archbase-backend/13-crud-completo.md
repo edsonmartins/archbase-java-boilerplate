@@ -1,225 +1,90 @@
-# 13. CRUD Completo - Exemplo Passo a Passo
+# 13. CRUD Completo - O Produto, passo a passo
 
-Exemplo completo de criação de CRUD seguindo todos os padrões Archbase.
+O CRUD de **Produto** é a fonte de verdade do boilerplate. Este arquivo descreve o que o código
+faz **hoje**, camada por camada, para quem for copiar o padrão para outro recurso.
 
----
-
-## Cenário
-
-Criar CRUD de **Produto** com:
-- Nome, SKU, descrição, preço, categoria, estoque, ativo
-- Busca com filtros
-- Multi-tenant
+Pacotes base: `br.com.archbase.boilerplate.core` (módulo `archbase-boilerplate-core`) e
+`br.com.archbase.boilerplate.rest` (módulo `archbase-boilerplate-rest`).
 
 ---
 
-## Passo 1: Domain Object
+## Mapa do fluxo real
 
-**Arquivo**: `core/domain/entity/Produto.java`
-
-```java
-package br.com.empresa.projeto.core.domain.entity;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.Objects;
-
-public class Produto {
-
-    private String id;
-    private String sku;
-    private String nome;
-    private String descricao;
-    private BigDecimal preco;
-    private String categoria;
-    private Integer estoque;
-    private Boolean ativo;
-    private String tenantId;
-    private LocalDateTime dataCriacao;
-
-    public Produto() {
-        this.ativo = true;
-        this.estoque = 0;
-    }
-
-    // Getters e Setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-
-    public String getSku() { return sku; }
-    public void setSku(String sku) { this.sku = sku; }
-
-    public String getNome() { return nome; }
-    public void setNome(String nome) { this.nome = nome; }
-
-    public String getDescricao() { return descricao; }
-    public void setDescricao(String descricao) { this.descricao = descricao; }
-
-    public BigDecimal getPreco() { return preco; }
-    public void setPreco(BigDecimal preco) { this.preco = preco; }
-
-    public String getCategoria() { return categoria; }
-    public void setCategoria(String categoria) { this.categoria = categoria; }
-
-    public Integer getEstoque() { return estoque; }
-    public void setEstoque(Integer estoque) { this.estoque = estoque; }
-
-    public Boolean getAtivo() { return ativo; }
-    public void setAtivo(Boolean ativo) { this.ativo = ativo; }
-
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
-
-    public LocalDateTime getDataCriacao() { return dataCriacao; }
-    public void setDataCriacao(LocalDateTime dataCriacao) { this.dataCriacao = dataCriacao; }
-
-    // Métodos de domínio
-    public void ativar() {
-        this.ativo = true;
-    }
-
-    public void desativar() {
-        this.ativo = false;
-    }
-
-    public boolean isAtivo() {
-        return Boolean.TRUE.equals(this.ativo);
-    }
-
-    public void adicionarEstoque(int quantidade) {
-        if (quantidade <= 0) {
-            throw new IllegalArgumentException("Quantidade deve ser positiva");
-        }
-        this.estoque += quantidade;
-    }
-
-    public void removerEstoque(int quantidade) {
-        if (quantidade <= 0) {
-            throw new IllegalArgumentException("Quantidade deve ser positiva");
-        }
-        if (this.estoque < quantidade) {
-            throw new IllegalArgumentException("Estoque insuficiente");
-        }
-        this.estoque -= quantidade;
-    }
-
-    public boolean temEstoque(int quantidade) {
-        return this.estoque >= quantidade;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Produto produto = (Produto) o;
-        return Objects.equals(id, produto.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id);
-    }
-}
 ```
+ProdutoController (rest)
+      │  chama direto
+      ▼
+ProdutoService (core.application.service)      ← @Service concreto, regras + @Transactional
+      │  usa direto
+      ▼
+ProdutoJpaRepository (ArchbaseCommonJpaRepository)
+      │
+      ▼
+ProdutoEntity (TenantPersistenceEntityBase)  →  .toDTO() / fromDTO()  →  ProdutoDTO
+```
+
+**Importante — o que existe mas NÃO está no fluxo:** `ProdutoPersistencePort`,
+`ProdutoPersistenceAdapter`, `ProdutoPersistenceMapper` (MapStruct) e a entidade de domínio `Produto`
+compilam e estão prontos (inclusive filtro RSQL via `FindDataWithFilterQuery` e estatísticas via
+QueryDSL), mas **nenhuma classe os injeta**. Hoje o `ProdutoService` fala com o `ProdutoJpaRepository`
+e converte com `ProdutoEntity.toDTO()`/`fromDTO()`. Não há pacote `port.in` nem use cases.
+
+Ao criar um recurso novo seguindo o padrão atual: Entity + JpaRepository + DTOs + Service +
+Controller. Port/Adapter/Mapper/Domain são o caminho hexagonal completo, a ser usado de propósito
+(ver `05`, `06`, `07`, `10`), não por inércia.
+
+---
+
+## Passo 1: Domain Object (opcional no fluxo atual)
+
+**Arquivo**: `core/domain/entity/Produto.java` — objeto puro, com Lombok
+(`@Data @Builder @NoArgsConstructor @AllArgsConstructor`), `CategoriaProduto categoria`
+(enum), datas `dataCriacao`/`dataAtualizacao`, `tenantId`, e comportamento (`ativar()`, `desativar()`,
+`adicionarEstoque`, `removerEstoque`, `atualizarPreco`) mais a fábrica `Produto.create(...)`.
+
+Enum `core/domain/enums/CategoriaProduto`: `ELETRONICOS, MOVEIS, ROUPAS, VESTUARIO, ALIMENTOS,
+BEBIDAS, LIMPEZA, HIGIENE, ESPORTES, LIVROS, OUTROS`.
+
+Exceções em `core/domain/exception` (ver `14-infraestrutura.md`): `BoilerplateException`,
+`EntityNotFoundException`, `DuplicateEntityException`, `BusinessValidationException`.
 
 ---
 
 ## Passo 2: DTOs
 
-**Arquivos**: `core/application/dto/ProdutoDTO.java`, `CreateProdutoDTO.java`
+**Pacote**: `core/application/dto` — `ProdutoCreateDTO`, `ProdutoUpdateDTO`, `ProdutoDTO`,
+`ProdutoEstatisticasDTO`. Todos Lombok (`@Data @Builder @NoArgsConstructor @AllArgsConstructor`).
+Os nomes são `ProdutoCreateDTO`/`ProdutoUpdateDTO` (sufixo, não `CreateProdutoDTO`).
 
 ```java
-// ProdutoDTO.java
-package br.com.empresa.projeto.core.application.dto;
+public class ProdutoCreateDTO {
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-
-@Schema(description = "DTO de Produto")
-public class ProdutoDTO {
-
-    @Schema(description = "ID do produto")
-    private String id;
-
-    @Schema(description = "SKU do produto")
-    private String sku;
-
-    @Schema(description = "Nome do produto")
+    @NotBlank(message = "O nome e obrigatorio")
+    @Size(min = 2, max = 200, message = "O nome deve ter entre 2 e 200 caracteres")
     private String nome;
 
-    @Schema(description = "Descrição do produto")
-    private String descricao;
+    @Size(max = 1000) private String descricao;
 
-    @Schema(description = "Preço do produto")
+    @NotNull @Positive @Digits(integer = 8, fraction = 2)
     private BigDecimal preco;
 
-    @Schema(description = "Categoria")
-    private String categoria;
+    @PositiveOrZero private Integer estoque;
 
-    @Schema(description = "Estoque atual")
-    private Integer estoque;
+    @NotNull(message = "A categoria e obrigatoria")
+    private CategoriaProduto categoria;
 
-    @Schema(description = "Status ativo")
-    private Boolean ativo;
-
-    @Schema(description = "Data de criação")
-    private LocalDateTime dataCriacao;
-
-    // Getters e Setters (ou @Data do Lombok)
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    // ... demais getters/setters
+    @Size(max = 100) private String sku;
+    @Size(max = 100) private String marca;
+    @Size(max = 500) private String urlImagem;
+    private Boolean destaque;
 }
 ```
 
-```java
-// CreateProdutoDTO.java
-package br.com.empresa.projeto.core.application.dto;
-
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.*;
-import java.math.BigDecimal;
-
-@Schema(description = "DTO para criação de Produto")
-public class CreateProdutoDTO {
-
-    @NotBlank(message = "SKU é obrigatório")
-    @Size(min = 3, max = 50, message = "SKU deve ter entre 3 e 50 caracteres")
-    @Schema(example = "PROD-001", required = true)
-    private String sku;
-
-    @NotBlank(message = "Nome é obrigatório")
-    @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
-    @Schema(example = "Produto Teste", required = true)
-    private String nome;
-
-    @Size(max = 500, message = "Descrição máxima 500 caracteres")
-    @Schema(example = "Descrição detalhada do produto")
-    private String descricao;
-
-    @NotNull(message = "Preço é obrigatório")
-    @Positive(message = "Preço deve ser positivo")
-    @Schema(example = "99.90", required = true)
-    private BigDecimal preco;
-
-    @NotBlank(message = "Categoria é obrigatória")
-    @Schema(example = "ELETRONICOS", required = true)
-    private String categoria;
-
-    @Min(value = 0, message = "Estoque não pode ser negativo")
-    @Schema(example = "10")
-    private Integer estoque = 0;
-
-    @Schema(example = "true")
-    private Boolean ativo = true;
-
-    // Getters e Setters
-    public String getSku() { return sku; }
-    public void setSku(String sku) { this.sku = sku; }
-    // ... demais getters/setters
-}
-```
+- `ProdutoUpdateDTO`: mesmos campos, **todos opcionais** (validações só se o valor vier) e com
+  `ativo`. O service aplica "só campos não nulos".
+- `ProdutoDTO` (resposta): inclui os campos de auditoria da base Archbase (`id`, `code`, `version`,
+  `createEntityDate`, `createdByUser`, `updateEntityDate`, `lastModifiedByUser`, `tenantId`) mais os de
+  negócio e `dataCadastro`; datas com `@JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")`.
 
 ---
 
@@ -227,59 +92,54 @@ public class CreateProdutoDTO {
 
 **Arquivo**: `core/infrastructure/output/persistence/entity/ProdutoEntity.java`
 
+Estende **`TenantPersistenceEntityBase`** (`br.com.archbase.ddd.domain.base`), que já traz `id`,
+`code`, `version`, `createEntityDate`, `createdByUser`, `updateEntityDate`, `lastModifiedByUser` e
+`tenantId`. Por isso as colunas na V1 são `dh_criacao`, `dh_atualizacao`, `versao`, `codigo`.
+
 ```java
-package br.com.empresa.projeto.core.infrastructure.output.persistence.entity;
-
-import br.com.archbase.ddd.domain.base.TenantPersistenceEntityBase;
-import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import java.math.BigDecimal;
-import java.util.HashSet;
-import java.util.Set;
-
 @Entity
-@Table(name = "PRODUTO",
-        indexes = {
-            @Index(name = "IDX_PRODUTO_SKU", columnList = "SKU"),
-            @Index(name = "IDX_PRODUTO_NOME", columnList = "NOME"),
-            @Index(name = "IDX_PRODUTO_CATEGORIA", columnList = "CATEGORIA"),
-            @Index(name = "IDX_PRODUTO_ATIVO", columnList = "ATIVO")
-        },
-        uniqueConstraints = {
-            @UniqueConstraint(name = "UK_PRODUTO_SKU", columnNames = {"SKU", "TENANT_ID"})
-        }
-)
-@Getter
-@Setter
-@AttributeOverrides({
-        @AttributeOverride(name = "id", column = @Column(name = "ID_PRODUTO")),
-        @AttributeOverride(name = "code", column = @Column(name = "CD_PRODUTO"))
+@Table(name = "produto", indexes = {
+        @Index(name = "idx_produto_nome", columnList = "nome"),
+        @Index(name = "idx_produto_sku", columnList = "sku", unique = true),
+        @Index(name = "idx_produto_categoria", columnList = "categoria"),
+        @Index(name = "idx_produto_ativo", columnList = "ativo")
 })
+@Getter @Setter
 public class ProdutoEntity extends TenantPersistenceEntityBase {
 
-    @Column(name = "SKU", nullable = false, length = 50)
-    private String sku;
+    @Column(name = "nome", nullable = false, length = 200) private String nome;
+    @Column(name = "preco", precision = 10, scale = 2)     private BigDecimal preco;
+    @Enumerated(EnumType.STRING) @Column(name = "categoria", length = 30)
+    private CategoriaProduto categoria;
+    @Column(name = "sku", unique = true, length = 100)      private String sku;
+    // descricao, estoque, ativo, dataCadastro, destaque, urlImagem, marca ...
 
-    @Column(name = "NOME", nullable = false, length = 100)
-    private String nome;
+    public ProdutoEntity() { super(); this.ativo = true; this.estoque = 0; this.destaque = false; }
 
-    @Column(name = "DESCRICAO", length = 500)
-    private String descricao;
+    @Builder
+    public ProdutoEntity(String id, String code, Long version, LocalDateTime createEntityDate,
+                         String createdByUser, LocalDateTime updateEntityDate,
+                         String lastModifiedByUser, String tenantId, String nome, /* ... */) {
+        super(id != null ? id : java.util.UUID.randomUUID().toString(),
+              code, version,
+              createEntityDate != null ? createEntityDate : LocalDateTime.now(),
+              createdByUser, updateEntityDate, lastModifiedByUser, tenantId);
+        // ... atribui campos com defaults (estoque 0, ativo true, destaque false)
+    }
 
-    @Column(name = "PRECO", precision = 19, scale = 2, nullable = false)
-    private BigDecimal preco;
-
-    @Column(name = "CATEGORIA", nullable = false, length = 50)
-    private String categoria;
-
-    @Column(name = "ESTOQUE")
-    private Integer estoque = 0;
-
-    @Column(name = "ATIVO")
-    private Boolean ativo = true;
+    public static ProdutoEntity fromDTO(ProdutoDTO dto) { ... }
+    public ProdutoDTO toDTO() { ... }
 }
 ```
+
+**Armadilhas reais (já corrigidas no código — não repita):**
+- O `@Builder` precisa gerar o `id` (UUID) e a `createEntityDate`: só o construtor **sem argumentos**
+  da base do Archbase gera UUID. Sem isso, `POST` falhava com *"Identifier of entity ... must be
+  manually assigned before calling 'persist()'"*.
+- As datas do Archbase são preenchidas por construtor, **não** por `@CreatedDate`/`@LastModifiedDate`.
+  Quem atualiza deve fazer `entity.setUpdateEntityDate(LocalDateTime.now())` (o `ProdutoService` faz).
+- `toDTO()`/`fromDTO()` devem mapear todos os campos da entidade; ao adicionar um campo, atualize os dois
+  métodos (o `ProdutoEntityTest` cobre a ida e volta de `marca`, `urlImagem` e `destaque`).
 
 ---
 
@@ -288,379 +148,150 @@ public class ProdutoEntity extends TenantPersistenceEntityBase {
 **Arquivo**: `core/infrastructure/output/persistence/repository/ProdutoJpaRepository.java`
 
 ```java
-package br.com.empresa.projeto.core.infrastructure.output.persistence.repository;
-
 import br.com.archbase.ddd.infraestructure.persistence.jpa.repository.ArchbaseCommonJpaRepository;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.entity.ProdutoEntity;
-import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ProdutoJpaRepository extends ArchbaseCommonJpaRepository<ProdutoEntity, String, Long> {
-    // SEM métodos customizados - queries no adapter
+
+    Optional<ProdutoEntity> findBySku(String sku);
+    boolean existsBySku(String sku);
+    List<ProdutoEntity> findByCategoria(CategoriaProduto categoria);
+    List<ProdutoEntity> findByAtivoTrue();
 }
 ```
+
+`ArchbaseCommonJpaRepository` está em `...ddd.infraestructure.persistence.jpa.repository` (note o
+"infraestructure" com "e"). A classe da aplicação registra `repositoryBaseClass =
+CommonArchbaseJpaRepository.class` em `@EnableJpaRepositories` (nomes parecidos, classes diferentes:
+`Common...` na base, `...Common` na interface).
 
 ---
 
-## Passo 5: Mapper
+## Passo 5: Service
 
-**Arquivo**: `core/infrastructure/output/persistence/mapper/ProdutoMapper.java`
+**Arquivo**: `core/application/service/ProdutoService.java` — `@Service @RequiredArgsConstructor
+@Slf4j`, injeta apenas `ProdutoJpaRepository`.
+
+Métodos: `criar(ProdutoCreateDTO)`, `criar(ProdutoDTO)`, `atualizar(String, ProdutoUpdateDTO)`,
+`atualizar(String, ProdutoDTO)`, `buscarPorId`, `buscarPorSku`, `buscarTodos(page, size[, sort])`,
+`buscarPorCategoria`, `buscarAtivos`, `remover`, `atualizarEstoque`, `ativar`, `inativar`.
+As sobrecargas com `ProdutoDTO` são mantidas "por compatibilidade".
 
 ```java
-package br.com.empresa.projeto.core.infrastructure.output.persistence.mapper;
+@Transactional
+public ProdutoDTO criar(ProdutoCreateDTO dto) {
+    if (dto.getSku() != null && repository.existsBySku(dto.getSku())) {
+        throw new DuplicateEntityException("Produto", "SKU", dto.getSku());     // -> 409
+    }
+    ProdutoEntity entity = ProdutoEntity.builder()
+            .nome(dto.getNome())
+            /* ... demais campos, com defaults ... */
+            .ativo(true)
+            .dataCadastro(LocalDateTime.now())
+            .build();
+    return repository.save(entity).toDTO();
+}
 
-import br.com.empresa.projeto.core.application.dto.CreateProdutoDTO;
-import br.com.empresa.projeto.core.application.dto.ProdutoDTO;
-import br.com.empresa.projeto.core.domain.entity.Produto;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.entity.ProdutoEntity;
-import org.mapstruct.InjectionStrategy;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.Named;
+@Transactional
+public ProdutoDTO atualizar(String id, ProdutoUpdateDTO dto) {
+    ProdutoEntity entity = repository.findById(id)
+            .orElseThrow(() -> new EntityNotFoundException("Produto", id));     // -> 404
+    // se o SKU mudou, confere duplicidade; só atualiza campos não nulos
+    entity.setUpdateEntityDate(LocalDateTime.now());   // as datas do Archbase não são automáticas
+    return repository.save(entity).toDTO();
+}
 
-@Mapper(
-    componentModel = "spring",
-    injectionStrategy = InjectionStrategy.CONSTRUCTOR
-)
-public interface ProdutoMapper {
-
-    // Domain ↔ DTO
-    ProdutoDTO toDTO(Produto domain);
-    Produto toDomain(CreateProdutoDTO dto);
-    Produto toDomain(ProdutoDTO dto);
-
-    // Domain ↔ Entity
-    ProdutoEntity toEntity(Produto domain);
-    Produto toDomain(ProdutoEntity entity);
-
-    // Entity ↔ DTO
-    ProdutoDTO entityToDTO(ProdutoEntity entity);
-
-    // Listas
-    java.util.List<ProdutoDTO> toDTOList(java.util.List<Produto> domains);
-    java.util.List<Produto> toDomainList(java.util.List<ProdutoEntity> entities);
-
-    // Ignorar campos de auditoria para CREATE
-    @Mapping(target = "id", ignore = true)
-    @Mapping(target = "tenantId", ignore = true)
-    @Mapping(target = "createEntityDate", ignore = true)
-    @Mapping(target = "createdByUser", ignore = true)
-    @Mapping(target = "updateEntityDate", ignore = true)
-    @Mapping(target = "lastModifiedByUser", ignore = true)
-    @Mapping(target = "version", ignore = true)
-    ProdutoEntity toEntityForCreate(Produto domain);
+public ProdutoDTO buscarPorId(String id) {
+    return repository.findById(id).map(ProdutoEntity::toDTO).orElse(null);   // null, não exceção
 }
 ```
+
+Convenções do service atual: erros de negócio são **exceções de domínio** (`DuplicateEntityException`,
+`EntityNotFoundException`), nunca `ResponseEntity`; escritas são `@Transactional`; leituras
+`buscarPorId`/`buscarPorSku` devolvem `null` e o controller converte em 404.
 
 ---
 
-## Passo 6: Ports
+## Passo 6: Controller
 
-**Arquivos**: `core/application/port/out/ProdutoPersistencePort.java`, `core/application/port/in/CreateProdutoUseCase.java`
-
-```java
-// ProdutoPersistencePort.java
-package br.com.empresa.projeto.core.application.port.out;
-
-import br.com.empresa.projeto.core.domain.entity.Produto;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-
-import java.util.List;
-import java.util.Optional;
-
-public interface ProdutoPersistencePort {
-
-    Produto save(Produto produto);
-
-    Optional<Produto> findById(String id);
-
-    Optional<Produto> findBySku(String sku, String tenantId);
-
-    List<Produto> findByTenantId(String tenantId);
-
-    List<Produto> findByAtivoAndTenantId(Boolean ativo, String tenantId);
-
-    Page<Produto> findAll(String tenantId, Pageable pageable);
-
-    void deleteById(String id);
-
-    boolean existsById(String id);
-
-    boolean existsBySku(String sku, String tenantId);
-}
-```
+**Arquivo**: `rest/infrastructure/input/rest/ProdutoController.java` — chama o `ProdutoService`
+direto, sem use cases, e **sem** `@RequireRole`/`@RequireProfile`/`@HasPermission`; só
+`@SecurityRequirement(name = "bearerAuth")` para o Swagger. Detalhes e tabela de rotas em
+`09-controller.md`.
 
 ```java
-// CreateProdutoUseCase.java
-package br.com.empresa.projeto.core.application.port.in;
-
-import br.com.empresa.projeto.core.application.dto.CreateProdutoDTO;
-import br.com.empresa.projeto.core.application.dto.ProdutoDTO;
-
-public interface CreateProdutoUseCase {
-    ProdutoDTO create(CreateProdutoDTO dto);
-}
-```
-
----
-
-## Passo 7: Adapter
-
-**Arquivo**: `core/infrastructure/output/persistence/adapter/ProdutoPersistenceAdapter.java`
-
-```java
-package br.com.empresa.projeto.core.infrastructure.output.persistence.adapter;
-
-import br.com.empresa.projeto.core.application.port.out.ProdutoPersistencePort;
-import br.com.empresa.projeto.core.domain.entity.Produto;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.entity.QProdutoEntity;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.mapper.ProdutoMapper;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.repository.ProdutoJpaRepository;
-import com.querydsl.jpa.impl.JPAQueryFactory;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Optional;
-
-@Slf4j
-@Component
-@RequiredArgsConstructor
-public class ProdutoPersistenceAdapter implements ProdutoPersistencePort {
-
-    private final ProdutoJpaRepository repository;
-    private final JPAQueryFactory queryFactory;
-    private final ProdutoMapper mapper;
-
-    @Override
-    @Transactional
-    public Produto save(Produto produto) {
-        log.debug("Salvando produto: {}", produto.getSku());
-        ProdutoEntity entity = mapper.toEntityForCreate(produto);
-        ProdutoEntity saved = repository.save(entity);
-        return mapper.toDomain(saved);
-    }
-
-    @Override
-    public Optional<Produto> findById(String id) {
-        return repository.findById(id)
-                .map(mapper::toDomain);
-    }
-
-    @Override
-    public Optional<Produto> findBySku(String sku, String tenantId) {
-        QProdutoEntity produto = QProdutoEntity.produtoEntity;
-        return Optional.ofNullable(
-                queryFactory
-                        .selectFrom(produto)
-                        .where(produto.sku.eq(sku)
-                                .and(produto.tenantId.eq(tenantId)))
-                        .fetchOne()
-        ).map(mapper::toDomain);
-    }
-
-    @Override
-    public List<Produto> findByTenantId(String tenantId) {
-        QProdutoEntity produto = QProdutoEntity.produtoEntity;
-        return queryFactory
-                .selectFrom(produto)
-                .where(produto.tenantId.eq(tenantId))
-                .fetch()
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
-    }
-
-    @Override
-    public List<Produto> findByAtivoAndTenantId(Boolean ativo, String tenantId) {
-        QProdutoEntity produto = QProdutoEntity.produtoEntity;
-        return queryFactory
-                .selectFrom(produto)
-                .where(produto.tenantId.eq(tenantId)
-                        .and(produto.ativo.eq(ativo)))
-                .fetch()
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
-    }
-
-    @Override
-    public Page<Produto> findAll(String tenantId, Pageable pageable) {
-        QProdutoEntity produto = QProdutoEntity.produtoEntity;
-        long total = queryFactory
-                .select(produto.count())
-                .from(produto)
-                .where(produto.tenantId.eq(tenantId))
-                .fetchOne();
-
-        List<Produto> content = queryFactory
-                .selectFrom(produto)
-                .where(produto.tenantId.eq(tenantId))
-                .orderBy(produto.nome.asc())
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
-                .fetch()
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
-
-        return new PageImpl<>(content, pageable, total);
-    }
-
-    @Override
-    public void deleteById(String id) {
-        repository.deleteById(id);
-    }
-
-    @Override
-    public boolean existsById(String id) {
-        return repository.existsById(id);
-    }
-
-    @Override
-    public boolean existsBySku(String sku, String tenantId) {
-        QProdutoEntity produto = QProdutoEntity.produtoEntity;
-        return queryFactory
-                .selectFrom(produto)
-                .where(produto.sku.eq(sku)
-                        .and(produto.tenantId.eq(tenantId)))
-                .fetchFirst() != null;
-    }
-}
-```
-
----
-
-## Passo 8: Service
-
-**Arquivo**: `core/application/service/ProdutoService.java`
-
-```java
-package br.com.empresa.projeto.core.application.service;
-
-import br.com.archbase.multitenancy.ArchbaseCurrentTenantIdentifierResolver;
-import br.com.empresa.projeto.core.application.dto.CreateProdutoDTO;
-import br.com.empresa.projeto.core.application.dto.ProdutoDTO;
-import br.com.empresa.projeto.core.application.mapper.ProdutoMapper;
-import br.com.empresa.projeto.core.application.port.in.CreateProdutoUseCase;
-import br.com.empresa.projeto.core.application.port.out.ProdutoPersistencePort;
-import br.com.empresa.projeto.core.domain.entity.Produto;
-import br.com.empresa.projeto.core.domain.exception.DomainException;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.UUID;
-
-@Slf4j
-@Service
-@RequiredArgsConstructor
-public class ProdutoService implements CreateProdutoUseCase {
-
-    private final ProdutoPersistencePort persistencePort;
-    private final ProdutoMapper mapper;
-    private final ArchbaseCurrentTenantIdentifierResolver tenantResolver;
-
-    @Override
-    @Transactional
-    public ProdutoDTO create(CreateProdutoDTO dto) {
-        log.info("Criando produto: {}", dto.getSku());
-
-        String tenantId = tenantResolver.getCurrentTenantId();
-
-        // Validar SKU único
-        if (persistencePort.existsBySku(dto.getSku(), tenantId)) {
-            throw new DomainException("Já existe produto com este SKU");
-        }
-
-        // Criar domain object
-        Produto produto = new Produto();
-        produto.setId(UUID.randomUUID().toString());
-        produto.setSku(dto.getSku());
-        produto.setNome(dto.getNome());
-        produto.setDescricao(dto.getDescricao());
-        produto.setPreco(dto.getPreco());
-        produto.setCategoria(dto.getCategoria());
-        produto.setEstoque(dto.getEstoque() != null ? dto.getEstoque() : 0);
-        produto.setAtivo(dto.getAtivo() != null ? dto.getAtivo() : true);
-        produto.setTenantId(tenantId);
-
-        // Salvar
-        Produto saved = persistencePort.save(produto);
-
-        log.info("Produto criado: {}", saved.getId());
-        return mapper.toDTO(saved);
-    }
-}
-```
-
----
-
-## Passo 9: Controller
-
-**Arquivo**: `rest/infrastructure/input/rest/ProdutoController.java`
-
-```java
-package br.com.empresa.projeto.rest.infrastructure.input.rest;
-
-import br.com.empresa.projeto.core.application.dto.CreateProdutoDTO;
-import br.com.empresa.projeto.core.application.dto.ProdutoDTO;
-import br.com.empresa.projeto.core.application.port.in.CreateProdutoUseCase;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 @RestController
 @RequestMapping("/api/v1/produtos")
+@Tag(name = "Produtos", description = "Gerenciamento de Produtos")
+@SecurityRequirement(name = "bearerAuth")
 @RequiredArgsConstructor
-@Tag(name = "Produtos")
+@Slf4j
+@Validated
 public class ProdutoController {
 
-    private final CreateProdutoUseCase createUseCase;
+    private final ProdutoService service;
 
     @PostMapping
-    @Operation(summary = "Criar novo produto")
-    public ResponseEntity<ProdutoDTO> create(
-            @Valid @RequestBody CreateProdutoDTO dto) {
-
-        ProdutoDTO created = createUseCase.create(dto);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<ProdutoDTO> criar(@Valid @RequestBody ProdutoCreateDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.criar(dto));
     }
+    // PUT /{id}, GET /{id}, GET /sku/{sku}, DELETE /{id}, POST /{id}/ativar, POST /{id}/inativar,
+    // PATCH /{id}/estoque, GET /categoria/{categoria}, GET /ativos, GET /findAll?page=&size=[&sort=]
 }
 ```
 
 ---
 
-## Resumo dos Arquivos Criados
+## Passo 7: Migration
 
-| # | Arquivo | Caminho |
-|---|---------|---------|
-| 1 | `Produto.java` | `core/domain/entity/` |
-| 2 | `ProdutoDTO.java` | `core/application/dto/` |
-| 3 | `CreateProdutoDTO.java` | `core/application/dto/` |
-| 4 | `ProdutoEntity.java` | `core/infrastructure/output/persistence/entity/` |
-| 5 | `ProdutoJpaRepository.java` | `core/infrastructure/output/persistence/repository/` |
-| 6 | `ProdutoMapper.java` | `core/infrastructure/output/persistence/mapper/` |
-| 7 | `ProdutoPersistencePort.java` | `core/application/port/out/` |
-| 8 | `CreateProdutoUseCase.java` | `core/application/port/in/` |
-| 9 | `ProdutoPersistenceAdapter.java` | `core/infrastructure/output/persistence/adapter/` |
-| 10 | `ProdutoService.java` | `core/application/service/` |
-| 11 | `ProdutoController.java` | `rest/infrastructure/input/rest/` |
+**Arquivo**: `rest/src/main/resources/db/migration/V1__schema_inicial.sql` — cria `produto` e as
+tabelas `seguranca_*` do Archbase. Em produção o Hibernate roda com `ddl-auto: validate`; sem a
+tabela do novo recurso numa migration, a aplicação **não sobe**. Ao criar entidade nova, escreva
+`V2__...sql` (ver `14-infraestrutura.md`). Colunas herdadas da base: `id`, `codigo`, `versao`,
+`dh_criacao`, `dh_atualizacao`, `tenant_id` (NOT NULL), `usuario_criou` e `ultimo_usuario_alterou`.
 
 ---
 
-**CRÍTICO**: Esta é a estrutura completa padrão. Siga estes passos para qualquer CRUD.
+## Passo 8: Testes
+
+- `core/src/test/.../ProdutoServiceTest` — unitário, Mockito sobre `ProdutoJpaRepository`, com
+  `@Nested` por método (`criar`, `atualizar`, `buscarPorId`, `remover`, status, busca).
+- `rest/src/test/.../AplicacaoSobeTest` — `@SpringBootTest` com PostgreSQL real; exercita criar/
+  atualizar de verdade (pega os erros de id e de datas que o unitário não vê). Se não houver
+  Postgres, o teste é pulado.
+
+Detalhes em `14-infraestrutura.md`.
+
+---
+
+## Checklist para um novo recurso, copiando o Produto
+
+1. `core/domain/enums` (se houver enum) e exceções de domínio já existentes.
+2. DTOs `XxxCreateDTO`, `XxxUpdateDTO`, `XxxDTO` com Bean Validation.
+3. `XxxEntity extends TenantPersistenceEntityBase` (`@Builder` gerando `id` e `createEntityDate`),
+   com `toDTO()` mapeando **todos** os campos.
+4. `XxxJpaRepository extends ArchbaseCommonJpaRepository<XxxEntity, String, Long>`.
+5. `XxxService` com `@Transactional` nas escritas, lançando exceções de domínio, e
+   `setUpdateEntityDate` nas alterações.
+6. `XxxController` em `/api/v1/<recurso>`, delegando ao service; decidir se algum endpoint precisa de
+   `@HasPermission` (ver `12-seguranca.md`).
+7. Migration `V{n}__xxx.sql`.
+8. Teste unitário do service + caso no teste de subida.
+
+## Resumo dos arquivos do Produto
+
+| Camada | Arquivo | No fluxo atual? |
+|--------|---------|-----------------|
+| Domain | `core/domain/entity/Produto.java`, `domain/enums/CategoriaProduto.java` | só via mapper (não usado) |
+| Exceções | `core/domain/exception/*.java` | sim |
+| DTO | `core/application/dto/Produto{,Create,Update,Estatisticas}DTO.java` | sim |
+| Port (saída) | `core/application/port/out/ProdutoPersistencePort.java` | não injetado |
+| Service | `core/application/service/ProdutoService.java` | sim |
+| Entity | `core/infrastructure/output/persistence/entity/ProdutoEntity.java` | sim |
+| Repository | `.../persistence/repository/ProdutoJpaRepository.java` | sim |
+| Adapter | `.../persistence/adapter/ProdutoPersistenceAdapter.java` | não injetado |
+| Mapper | `.../persistence/mapper/ProdutoPersistenceMapper.java` | não injetado |
+| Controller | `rest/infrastructure/input/rest/ProdutoController.java` | sim |
+| Migration | `rest/src/main/resources/db/migration/V1__schema_inicial.sql` | sim |
+| Seed | `rest/seed/DataSeedLoader.java` (perfil `dev`) | sim |
+| Testes | `ProdutoServiceTest`, `AplicacaoSobeTest` | sim |

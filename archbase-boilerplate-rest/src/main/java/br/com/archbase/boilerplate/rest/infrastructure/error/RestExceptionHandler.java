@@ -25,6 +25,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -226,6 +228,12 @@ public class RestExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     private ResponseEntity<Object> buildResponseEntity(ApiError apiError) {
+        // Centralizado aqui, e não em cada handler: todos passam por este método, e só alguns
+        // recebem o WebRequest. Só o caminho — a query string pode carregar token ou dado pessoal.
+        if (apiError.getPath() == null
+                && RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs) {
+            apiError.setPath(attrs.getRequest().getRequestURI());
+        }
         return new ResponseEntity<>(apiError, apiError.getStatus());
     }
 }

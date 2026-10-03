@@ -279,6 +279,7 @@ management:
 # Security Configuration
 security:
   rate-limit:
+    enabled: true
     webhook:
       limit: 100
       duration: 60

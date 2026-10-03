@@ -1,218 +1,230 @@
 # 01. Estrutura de Projeto
 
-Estrutura hexagonal completa para projetos Spring Boot 3 com Archbase Framework.
+Estrutura hexagonal do boilerplate: Spring Boot 4.1.0, Java 25, Archbase 3.2.2, Maven multi-módulo.
+O CRUD de `Produto` é a referência de código (o que o repositório faz hoje).
 
 ---
 
 ## Estrutura de Diretórios
 
 ```
-project-core/
-├── src/main/java/
-│   └── br/com/empresa/projeto/
-│       ├── domain/                          # DOMÍNIO (puro, sem dependências)
-│       │   ├── entity/                      # Domain Objects
-│       │   └── enums/                       # Enums do domínio
-│       ├── application/                     # APLICAÇÃO (use cases, ports)
-│       │   ├── port/
-│       │   │   ├── in/                      # Ports de entrada (use cases)
-│       │   │   └── out/                     # Ports de saída (persistence, external)
-│       │   ├── service/                     # Serviços que implementam ports
-│       │   └── dto/                         # DTOs
-│       └── infrastructure/                  # INFRAESTRUTURA
-│           ├── output/
-│           │   ├── persistence/
-│           │   │   ├── entity/              # JPA Entities
-│           │   │   ├── repository/          # JPA Repositories
-│           │   │   └── adapter/             # Persistence Adapters
-│           │   └── mapper/                  # MapStruct Mappers
-│           └── config/                      # Configurações Spring
+archbase-java-boilerplate/                       # pom pai (br.com.archbase.boilerplate:archbase-java-boilerplate)
+├── pom.xml
+├── Makefile  docker-compose.yml  .env.example
 │
-└── src/main/resources/
-    ├── application.yml
-    └── application-dev.yml
+├── archbase-boilerplate-core/
+│   └── src/main/java/br/com/archbase/boilerplate/core/
+│       ├── domain/
+│       │   ├── entity/                          # Produto (domínio)
+│       │   ├── enums/                           # CategoriaProduto
+│       │   └── exception/                       # BoilerplateException e filhas
+│       ├── application/
+│       │   ├── port/out/                        # ProdutoPersistencePort
+│       │   ├── service/                         # ProdutoService, security/*
+│       │   └── dto/                             # ProdutoDTO, ProdutoCreateDTO, ProdutoUpdateDTO, ProdutoEstatisticasDTO
+│       └── infrastructure/output/persistence/
+│           ├── entity/                          # ProdutoEntity (JPA) + QProdutoEntity (gerada)
+│           ├── repository/                      # ProdutoJpaRepository
+│           ├── adapter/                         # ProdutoPersistenceAdapter
+│           └── mapper/                          # ProdutoPersistenceMapper (MapStruct)
+│
+└── archbase-boilerplate-rest/
+    ├── src/main/java/br/com/archbase/boilerplate/rest/
+    │   ├── ArchbaseBoilerplateApplication.java  # Main class
+    │   ├── infrastructure/
+    │   │   ├── input/rest/                      # ProdutoController
+    │   │   ├── config/                          # QueryDslConfig, OpenAPIConfig, JacksonConfig, RateLimitingConfig...  (+ filter/RateLimitingFilter)
+    │   │   ├── error/                           # RestExceptionHandler, ApiError
+    │   │   └── filter/                          # TenantContextFilter, TenantAccessValidationFilter
+    │   └── seed/                                # AdminSeedLoader, DataSeedLoader
+    └── src/main/resources/
+        ├── application.yml  application-{dev,h2,homolog,prod}.yml
+        ├── db/migration/V1__schema_inicial.sql  # Flyway
+        └── ehcache.xml  logback-spring.xml
 ```
 
-```
-project-rest/
-├── src/main/java/
-│   └── br/com/empresa/projeto/
-│       └── rest/
-│           ├── infrastructure/
-│           │   ├── input/
-│           │   │   └── rest/                # Controllers REST
-│           │   └── config/                  # Configurações REST
-│           └── ProjectApplication.java      # Main class
-└── src/main/resources/
-    ├── application.yml
-    └── application-dev.yml
-```
+Observação: hoje não existe `port/in` (use cases). O `ProdutoController` chama `ProdutoService`, que usa
+`ProdutoJpaRepository` direto e converte com `ProdutoEntity.toDTO()` / `fromDTO()`. O trio
+`ProdutoPersistencePort` + `ProdutoPersistenceAdapter` + `ProdutoPersistenceMapper` (domínio `Produto` <-> entity)
+existe e compila, mas nenhuma classe do repositório o injeta além do próprio adapter.
 
 ---
 
-## pom.xml (Parent)
+## pom.xml (Parent) — trechos reais
 
 ```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+<parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.1.0</version>
+    <relativePath/>
+</parent>
 
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.6</version>
-    </parent>
+<groupId>br.com.archbase.boilerplate</groupId>
+<artifactId>archbase-java-boilerplate</artifactId>
+<version>1.0.0</version>
+<packaging>pom</packaging>
 
-    <groupId>br.com.empresa.projeto</groupId>
-    <artifactId>project</artifactId>
-    <version>1.0.0</version>
-    <packaging>pom</packaging>
+<modules>
+    <module>archbase-boilerplate-core</module>
+    <module>archbase-boilerplate-rest</module>
+</modules>
 
-    <modules>
-        <module>project-core</module>
-        <module>project-rest</module>
-    </modules>
-
-    <properties>
-        <java.version>17</java.version>
-        <archbase.version>2.0.0</archbase.version>
-        <querydsl.version>5.1.0</querydsl.version>
-        <org.mapstruct.version>1.5.5.Final</org.mapstruct.version>
-        <lombok.version>1.18.34</lombok.version>
-    </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>br.com.archbase</groupId>
-                <artifactId>archbase-starter</artifactId>
-                <version>${archbase.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.querydsl</groupId>
-                <artifactId>querydsl-jpa</artifactId>
-                <classifier>jakarta</classifier>
-                <version>${querydsl.version}</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-</project>
+<properties>
+    <java.version>25</java.version>
+    <archbase.version>3.2.2</archbase.version>
+    <org.mapstruct.version>1.6.3</org.mapstruct.version>
+    <!-- QueryDSL: fork openfeign (Jakarta). NÃO sobrescrever querydsl.version
+         (o spring-boot-dependencies usa para o querydsl-bom). -->
+    <openfeign-querydsl.version>7.2</openfeign-querydsl.version>
+    <postgresql.version>42.7.8</postgresql.version>
+    <h2.version>2.2.224</h2.version>
+    <springdoc.version>3.0.0</springdoc.version>
+    <jjwt.version>0.13.0</jjwt.version>
+    <caffeine.version>3.1.8</caffeine.version>
+    <lombok.version>1.18.46</lombok.version>
+    <langchain4j.version>1.17.0</langchain4j.version>
+</properties>
 ```
+
+No `dependencyManagement` do pai: `archbase-starter`, `archbase-starter-flyway`, postgresql, h2,
+`io.github.openfeign.querydsl:querydsl-jpa` e `querydsl-apt` (classifier `jakarta`, scope `provided`),
+springdoc, jjwt, caffeine, mapstruct e langchain4j.
 
 ---
 
-## pom.xml (Core Module)
+## pom.xml (Core) — trechos reais
 
 ```xml
 <dependencies>
-    <!-- Archbase Framework -->
-    <dependency>
-        <groupId>br.com.archbase</groupId>
-        <artifactId>archbase-starter</artifactId>
-    </dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-jpa</artifactId></dependency>
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-validation</artifactId></dependency>
 
-    <!-- QueryDSL -->
+    <dependency><groupId>br.com.archbase</groupId><artifactId>archbase-starter</artifactId></dependency>
+
+    <!-- Flyway: o schema é versionado (prod usa ddl-auto: validate) -->
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
+    <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
+    <dependency><groupId>br.com.archbase</groupId><artifactId>archbase-starter-flyway</artifactId></dependency>
+
+    <!-- QueryDSL (fork openfeign) -->
     <dependency>
-        <groupId>com.querydsl</groupId>
+        <groupId>io.github.openfeign.querydsl</groupId>
         <artifactId>querydsl-jpa</artifactId>
-        <classifier>jakarta</classifier>
     </dependency>
     <dependency>
-        <groupId>com.querydsl</groupId>
+        <groupId>io.github.openfeign.querydsl</groupId>
         <artifactId>querydsl-apt</artifactId>
         <classifier>jakarta</classifier>
         <scope>provided</scope>
     </dependency>
 
-    <!-- MapStruct -->
-    <dependency>
-        <groupId>org.mapstruct</groupId>
-        <artifactId>mapstruct</artifactId>
-    </dependency>
-
-    <!-- Lombok -->
-    <dependency>
-        <groupId>org.projectlombok</groupId>
-        <artifactId>lombok</artifactId>
-    </dependency>
+    <dependency><groupId>org.mapstruct</groupId><artifactId>mapstruct</artifactId></dependency>
+    <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><optional>true</optional></dependency>
+    <!-- também: postgresql (runtime), h2 (test), caffeine, ehcache (jakarta), hibernate-jcache,
+         spring-boot-starter-test e junit-platform-launcher (test) -->
 </dependencies>
 
 <build>
     <plugins>
         <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
             <configuration>
+                <release>${java.version}</release>
+                <!-- Java 23+ não roda annotation processing implicitamente -->
+                <proc>full</proc>
                 <annotationProcessorPaths>
+                    <path>lombok ${lombok.version}</path>
+                    <path>lombok-mapstruct-binding 0.2.0</path>
+                    <path>mapstruct-processor ${org.mapstruct.version}</path>
                     <path>
-                        <groupId>org.projectlombok</groupId>
-                        <artifactId>lombok</artifactId>
-                        <version>${lombok.version}</version>
-                    </path>
-                    <path>
-                        <groupId>com.querydsl</groupId>
+                        <groupId>io.github.openfeign.querydsl</groupId>
                         <artifactId>querydsl-apt</artifactId>
+                        <version>${openfeign-querydsl.version}</version>
                         <classifier>jakarta</classifier>
-                        <version>${querydsl.version}</version>
                     </path>
-                    <path>
-                        <groupId>jakarta.persistence</groupId>
-                        <artifactId>jakarta.persistence-api</artifactId>
-                        <version>3.1.0</version>
-                    </path>
-                    <path>
-                        <groupId>org.mapstruct</groupId>
-                        <artifactId>mapstruct-processor</artifactId>
-                        <version>${org.mapstruct.version}</version>
-                    </path>
+                    <path>jakarta.persistence-api 3.1.0</path>
                 </annotationProcessorPaths>
+                <compilerArgs>
+                    <arg>-Amapstruct.suppressGeneratorTimestamp=true</arg>
+                    <arg>-Amapstruct.defaultComponentModel=spring</arg>
+                </compilerArgs>
             </configuration>
         </plugin>
     </plugins>
 </build>
 ```
 
+(`<path>nome versão</path>` acima é abreviação; no pom cada `path` tem `groupId`/`artifactId`/`version`.)
+
+## pom.xml (REST)
+
+Depende de `archbase-boilerplate-core` e declara: `spring-boot-starter-web` (com o Tomcat excluído) +
+`spring-boot-starter-jetty` + `org.eclipse.jetty.http2:jetty-http2-server` (obrigatório com
+`server.http2.enabled: true`), `starter-actuator`, `starter-security`, `starter-validation`,
+`starter-webflux`, `starter-hateoas` e `starter-data-rest` (o springdoc/Archbase exigem as autoconfigurações;
+sem eles a aplicação não sobe), `springdoc-openapi-starter-webmvc-ui`, `jedis`, `bucket4j-core` 7.6.0 e `h2`
+(runtime). Plugins: `spring-boot-maven-plugin` e `maven-failsafe-plugin` (testes `*IT` só rodam com
+`mvn verify`).
+
 ---
 
-## application.yml
+## application.yml (principais blocos reais)
 
 ```yaml
 spring:
-  application:
-    name: projeto-api
+  profiles:
+    active: ${APP_PROFILE:dev}
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/projeto}
-    username: ${DATABASE_USER:projeto}
-    password: ${DATABASE_PASSWORD:changeit}
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DATABASE:archbase_db}
+    username: ${POSTGRES_USER:archbase}
+    password: ${POSTGRES_PASSWORD:changeit}
   jpa:
     hibernate:
-      ddl-auto: validate
-    show-sql: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+      ddl-auto: update            # prod: validate
+    open-in-view: true            # o archbase-security depende do OSIV
+  data:
+    rest:
+      detection-strategy: annotated   # não publicar CRUD HTTP para todo repositório
 
-# Archbase
 archbase:
   multitenancy:
     enabled: true
-    default-tenant-id: default-tenant
+  app:
+    tenant:
+      default:
+        id: ${ARCHBASE_DEFAULT_TENANT_ID:a9f814d2-4dae-41f3-851b-8aa3d4706561}
+      accept-query-param: false
+      fail-on-missing: false
+    jpa:
+      repositories: br.com.archbase.boilerplate.core.infrastructure.output.persistence.repository
+      entities: br.com.archbase.boilerplate.core.infrastructure.output.persistence.entity
+    component:
+      scan: br.com.archbase.boilerplate
   security:
     jwt:
-      secret-key: ${JWT_SECRET:change-this-secret-key}
+      secret-key: ${ARCHBASE_JWT_SECRET:change-this-secret-key-in-production}
       token-expiration: 86400000
-    scan-packages: br.com.empresa.projeto.rest.infrastructure.input.rest
-    whitelist: /actuator/health,/swagger-ui/**,/v3/api-docs/**
-
-# OpenAPI
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
+      refresh-expiration: 604800000
+      strict-token-use: true
+    scan-packages: br.com.archbase.boilerplate.rest.infrastructure.input.rest
+    whitelist: /actuator/health,/swagger-ui/**,/v3/api-docs/**,/api/v1/public/**
+    # endurecimento ligado: prevent-user-enumeration, password.*, admin-guard,
+    # hardening.validation: fail, public-paths.registration: false ...
 ```
+
+O bloco `archbase.security` completo (política de senha com `min-length: 12`, `admin-endpoints.policy: permit`,
+CORS etc.) está comentado no próprio `application.yml` — leia lá antes de afrouxar qualquer flag.
+
+Perfis: `dev` (padrão; Flyway ligado, `ddl-auto: update`), `h2` (banco em memória, escolha consciente),
+`homolog` e `prod` (`ddl-auto: validate`, Flyway dono do schema).
+
+## Migrations (Flyway)
+
+`archbase-boilerplate-rest/src/main/resources/db/migration/V1__schema_inicial.sql` cria `produto` e as tabelas de
+segurança do Archbase. É gerado a partir do mapeamento (pg_dump de um banco criado com `ddl-auto=create`), não
+escrito à mão. Entidade nova: gere/escreva a migration e confira localmente com `ddl-auto: validate`.
 
 ---
 
@@ -220,44 +232,50 @@ springdoc:
 
 ```java
 @SpringBootApplication
-@ComponentScan(basePackages = {"br.com.empresa.projeto"})
+@ComponentScan(basePackages = {"br.com.archbase.boilerplate"})
 @EntityScan(basePackages = {
-    "br.com.empresa.projeto.core.infrastructure.output.persistence.entity",
+    "br.com.archbase.boilerplate.core.infrastructure.output.persistence.entity",
     "br.com.archbase.ddd.domain.entity"
-})
+})   // import org.springframework.boot.persistence.autoconfigure.EntityScan (Boot 4)
 @EnableJpaRepositories(
-    basePackages = {"br.com.empresa.projeto.core.infrastructure.output.persistence.repository"},
+    basePackages = {"br.com.archbase.boilerplate.core.infrastructure.output.persistence.repository"},
     repositoryBaseClass = CommonArchbaseJpaRepository.class
 )
 @EnableTransactionManagement
-public class ProjectApplication {
+public class ArchbaseBoilerplateApplication {
     public static void main(String[] args) {
-        SpringApplication.run(ProjectApplication.class, args);
+        SpringApplication.run(ArchbaseBoilerplateApplication.class, args);
     }
 }
 ```
 
+`CommonArchbaseJpaRepository` vem de `br.com.archbase.ddd.infraestructure.persistence.jpa.repository`.
+O `JPAQueryFactory` usado pelos adapters é fornecido por `QueryDslConfig` (módulo rest).
+
 ---
 
-## Comandos Maven Úteis
+## Comandos Úteis
 
 ```bash
-# Compilar projeto
-mvn clean compile
+# Infra local (PostgreSQL, Redis, Adminer, RedisInsight)
+make docker-up
 
-# Gerar classes Q (QueryDSL)
-mvn clean process-sources
+# Compilar (gera as classes Q do QueryDSL em target/generated-sources)
+mvn clean compile
 
 # Empacotar sem testes
 mvn clean package -DskipTests
 
-# Executar com profile dev
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+# Testes: mvn test (sem infra); mvn verify também roda *IT (exigem banco)
+mvn test
 
-# Executar JAR
-java -jar project-rest/target/project-rest-1.0.0.jar --spring.profiles.active=dev
+# Executar (profile dev é o padrão)
+mvn spring-boot:run -pl archbase-boilerplate-rest
+
+# Executar em H2, sem infraestrutura
+mvn spring-boot:run -pl archbase-boilerplate-rest -Dspring-boot.run.profiles=h2
 ```
 
 ---
 
-**IMPORTANTE**: Sempre use `ArchbaseCommonJpaRepository` como base para repositories e `TenantPersistenceEntityBase` para entidades multi-tenant.
+**IMPORTANTE**: Repositories estendem `ArchbaseCommonJpaRepository<Entity, String, Long>` e entidades multi-tenant estendem `TenantPersistenceEntityBase`.

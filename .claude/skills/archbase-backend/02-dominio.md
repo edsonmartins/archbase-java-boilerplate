@@ -1,238 +1,173 @@
 # 02. Domain Objects
 
-Domain Objects são objetos puros do domínio, sem dependências de infraestrutura (JPA, Spring, etc.).
+Domain Objects são objetos de domínio sem dependências de infraestrutura (JPA, Spring etc.). O exemplo real é
+`Produto`.
 
 ---
 
 ## Conceito
 
-**CRÍTICO**: Domain Objects devem ser:
-- Puros Java (sem anotações JPA)
-- Independentes de frameworks
-- Focados no negócio
-- Com equals(), hashCode() e toString()
+O `Produto` do boilerplate:
+- Fica em `br.com.archbase.boilerplate.core.domain.entity`
+- Não tem anotações JPA nem Spring (só Lombok e tipos Java)
+- Usa Lombok `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor` (equals/hashCode/toString gerados
+  pelo `@Data`, sobre todos os campos)
+- Tem método de fábrica estático e métodos de domínio com a regra de negócio
 
 ---
 
-## Estrutura Básica
+## Estrutura Real: Produto
 
 ```java
-package br.com.empresa.projeto.core.domain.entity;
+package br.com.archbase.boilerplate.core.domain.entity;
 
-import java.util.Objects;
+import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-public class Example {
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Produto {
 
     private String id;
     private String nome;
+    private String sku;
     private String descricao;
+    private BigDecimal preco;
+    private CategoriaProduto categoria;
+    private Integer estoque;
     private Boolean ativo;
+    private LocalDateTime dataCriacao;
+    private LocalDateTime dataAtualizacao;
+    private String tenantId;
+    private Boolean destaque;
+    private String urlImagem;
+    private String marca;
 
-    public Example() {
+    /** Método de fábrica para criar um novo produto. */
+    public static Produto create(String nome, String sku, BigDecimal preco, CategoriaProduto categoria) {
+        return Produto.builder()
+                .id(UUID.randomUUID().toString())
+                .nome(nome)
+                .sku(sku)
+                .preco(preco)
+                .categoria(categoria)
+                .ativo(true)
+                .destaque(false)
+                .estoque(0)
+                .dataCriacao(LocalDateTime.now())
+                .dataAtualizacao(LocalDateTime.now())
+                .build();
     }
 
-    public Example(String id, String nome, String descricao, Boolean ativo) {
-        this.id = id;
-        this.nome = nome;
-        this.descricao = descricao;
-        this.ativo = ativo;
-    }
-
-    // Getters
-    public String getId() { return id; }
-    public String getNome() { return nome; }
-    public String getDescricao() { return descricao; }
-    public Boolean getAtivo() { return ativo; }
-
-    // Setters
-    public void setId(String id) { this.id = id; }
-    public void setNome(String nome) { this.nome = nome; }
-    public void setDescricao(String descricao) { this.descricao = descricao; }
-    public void setAtivo(Boolean ativo) { this.ativo = ativo; }
-
-    // equals e hashCode baseados em ID
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Example example = (Example) o;
-        return Objects.equals(id, example.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id);
-    }
-
-    @Override
-    public String toString() {
-        return "Example{" +
-                "id='" + id + '\'' +
-                ", nome='" + nome + '\'' +
-                ", ativo=" + ativo +
-                '}';
-    }
-
-    // Métodos de domínio
-    public void activate() {
+    public void ativar() {
         this.ativo = true;
+        this.dataAtualizacao = LocalDateTime.now();
     }
 
-    public void deactivate() {
+    public void desativar() {
         this.ativo = false;
+        this.dataAtualizacao = LocalDateTime.now();
     }
 
-    public boolean isActive() {
-        return Boolean.TRUE.equals(this.ativo);
+    public void adicionarEstoque(Integer quantidade) {
+        this.estoque += quantidade;
+        this.dataAtualizacao = LocalDateTime.now();
+    }
+
+    public void removerEstoque(Integer quantidade) {
+        if (this.estoque < quantidade) {
+            throw new IllegalArgumentException("Estoque insuficiente");
+        }
+        this.estoque -= quantidade;
+        this.dataAtualizacao = LocalDateTime.now();
+    }
+
+    public void atualizarPreco(BigDecimal novoPreco) {
+        if (novoPreco == null || novoPreco.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Preço inválido");
+        }
+        this.preco = novoPreco;
+        this.dataAtualizacao = LocalDateTime.now();
     }
 }
 ```
 
 ---
 
-## Domain Object com Enum
+## Enum de Domínio
+
+Enums ficam em `core.domain.enums` (não aninhados no domain object):
 
 ```java
-package br.com.empresa.projeto.core.domain.entity;
+package br.com.archbase.boilerplate.core.domain.enums;
 
-import br.com.empresa.projeto.core.domain.enums.Status;
+import lombok.Getter;
 
-public class Pedido {
+@Getter
+public enum CategoriaProduto {
 
-    private String id;
-    private String clienteId;
-    private BigDecimal valorTotal;
-    private Status status;
+    ELETRONICOS("Eletrônicos"),
+    MOVEIS("Móveis"),
+    ROUPAS("Roupas"),
+    VESTUARIO("Vestuário"),
+    ALIMENTOS("Alimentos"),
+    BEBIDAS("Bebidas"),
+    LIMPEZA("Limpeza"),
+    HIGIENE("Higiene"),
+    ESPORTES("Esportes"),
+    LIVROS("Livros"),
+    OUTROS("Outros");
 
-    public enum Status {
-        CRIADO, PENDENTE_PAGAMENTO, PAGO, ENVIADO, ENTREGUE, CANCELADO
-    }
+    private final String descricao;
 
-    // Getters e Setters...
-
-    // Métodos de domínio
-    public void pagar() {
-        if (this.status != Status.PENDENTE_PAGAMENTO) {
-            throw new IllegalStateException("Pedido não está pendente de pagamento");
-        }
-        this.status = Status.PAGO;
-    }
-
-    public void enviar() {
-        if (this.status != Status.PAGO) {
-            throw new IllegalStateException("Pedido não está pago");
-        }
-        this.status = Status.ENVIADO;
-    }
-
-    public void cancelar() {
-        if (this.status == Status.ENVIADO || this.status == Status.ENTREGUE) {
-            throw new IllegalStateException("Pedido não pode ser cancelado");
-        }
-        this.status = Status.CANCELADO;
-    }
-
-    public boolean podePagar() {
-        return this.status == Status.PENDENTE_PAGAMENTO;
-    }
-
-    public boolean podeCancelar() {
-        return this.status == Status.CRIADO
-            || this.status == Status.PENDENTE_PAGAMENTO;
+    CategoriaProduto(String descricao) {
+        this.descricao = descricao;
     }
 }
 ```
+
+Na entidade JPA o enum é gravado com `@Enumerated(EnumType.STRING)`; a migration V1 tem um CHECK com esses nomes —
+ao acrescentar um valor ao enum, acrescente também uma migration que altere o CHECK.
 
 ---
 
-## Value Object
+## Domain Exceptions
+
+Hierarquia real em `br.com.archbase.boilerplate.core.domain.exception`, todas `RuntimeException`:
 
 ```java
-package br.com.empresa.projeto.core.domain.valueobject;
+public class BoilerplateException extends RuntimeException {      // base
+    public BoilerplateException(String message) { super(message); }
+    public BoilerplateException(String message, Throwable cause) { super(message, cause); }
+}
 
-import java.math.BigDecimal;
-import java.util.Objects;
+// extends BoilerplateException
+public class EntityNotFoundException      // (entityName, identifier) ou (entityName, fieldName, identifier)
+public class DuplicateEntityException     // (entityName, field, value) -> "%s já existe com %s: %s"
+public class BusinessValidationException  // (message) ou (field, message); getField()
+```
 
-public class Dinheiro {
+Uso no `ProdutoService`:
 
-    private final BigDecimal valor;
-    private final String moeda;
-
-    public Dinheiro(BigDecimal valor, String moeda) {
-        if (valor == null || valor.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Valor deve ser positivo");
-        }
-        this.valor = valor;
-        this.moeda = Objects.requireNonNull(moeda);
-    }
-
-    public BigDecimal getValor() { return valor; }
-    public String getMoeda() { return moeda; }
-
-    public Dinheiro somar(Dinheiro outro) {
-        if (!this.moeda.equals(outro.moeda)) {
-            throw new IllegalArgumentException("Moedas diferentes");
-        }
-        return new Dinheiro(this.valor.add(outro.valor), this.moeda);
-    }
-
-    public Dinheiro multiplicar(BigDecimal fator) {
-        return new Dinheiro(this.valor.multiply(fator), this.moeda);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Dinheiro dinheiro = (Dinheiro) o;
-        return Objects.equals(valor, dinheiro.valor) &&
-               Objects.equals(moeda, dinheiro.moeda);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(valor, moeda);
-    }
+```java
+if (dto.getSku() != null && repository.existsBySku(dto.getSku())) {
+    throw new DuplicateEntityException("Produto", "SKU", dto.getSku());
 }
 ```
 
----
-
-## Domain Exception
-
-```java
-package br.com.empresa.projeto.core.domain.exception;
-
-public class DomainException extends RuntimeException {
-
-    private final String code;
-
-    public DomainException(String message) {
-        super(message);
-        this.code = "DOMAIN_ERROR";
-    }
-
-    public DomainException(String code, String message) {
-        super(message);
-        this.code = code;
-    }
-
-    public String getCode() {
-        return code;
-    }
-}
-```
-
-```java
-// Exemplo de uso específico
-public class PedidoNaoEncontradoException extends DomainException {
-
-    public PedidoNaoEncontradoException(String id) {
-        super("PEDIDO_NAO_ENCONTRADO",
-              "Pedido com ID " + id + " não foi encontrado");
-    }
-}
-```
+O `RestExceptionHandler` (módulo rest) tem handler para `EntityNotFoundException`, `DuplicateEntityException`,
+`BusinessValidationException` e a base `BoilerplateException`, além de `IllegalArgumentException` (que é o que
+`Produto.removerEstoque`/`atualizarPreco` lançam) e outras exceções de Spring/JPA. Exceção de negócio nova deve
+estender `BoilerplateException`.
 
 ---
 
@@ -240,13 +175,15 @@ public class PedidoNaoEncontradoException extends DomainException {
 
 | Prática | Descrição |
 |---------|-----------|
-| **Sem JPA** | Não usar anotações `@Entity`, `@Column` etc. |
-| **Métodos de domínio** | Lógica de negócio no domain object |
-| **Imutabilidade** | Value Objects devem ser imutáveis (`final`) |
-| **equals/hashCode** | Baseados em ID para entidades |
-| **Validações** | Lançar `DomainException` para regras de negócio |
-| **Sem dependências externas** | Apenas Java puro |
+| **Sem JPA** | Não usar `@Entity`, `@Column` etc. no domain object |
+| **Métodos de domínio** | Regra de negócio no domain object (`ativar`, `removerEstoque`...) |
+| **Fábrica estática** | `Produto.create(...)` define os defaults (ativo, estoque 0, datas) |
+| **Lombok** | `@Data` + `@Builder` + construtores, como em `Produto` |
+| **Exceções** | Estender `BoilerplateException`; o `RestExceptionHandler` converte em `ApiError` |
+| **Sem frameworks** | Apenas Java e Lombok |
 
 ---
 
-**IMPORTANTE**: Domain Objects são mapeados para JPA Entities via mappers, não são as próprias entities.
+**IMPORTANTE**: Domain Objects são mapeados para JPA Entities via mapper (`ProdutoPersistenceMapper`), não são as
+próprias entities. Hoje o fluxo HTTP do `Produto` não passa pelo domain object: `ProdutoService` trabalha com
+`ProdutoEntity` e DTOs. O domain object só é usado pelo `ProdutoPersistenceAdapter`.

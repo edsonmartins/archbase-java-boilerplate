@@ -1,18 +1,36 @@
 # 12. Segurança Archbase
 
-Anotações de segurança do Archbase Framework.
+Anotações e configuração de segurança do Archbase Framework (`archbase-security`).
 
 ---
 
-## Conceito
+## Como o boilerplate protege hoje
 
-**CRÍTICO**: Use SEMPRE anotações Archbase, NUNCA Spring Security:
+Fatos do código atual, que este arquivo toma como ponto de partida:
+
+- O `ProdutoController` **não tem nenhuma anotação de autorização**. Ele só tem
+  `@SecurityRequirement(name = "bearerAuth")`, que é documentação OpenAPI e não autoriza nada.
+- A proteção real é: **tudo exige autenticação (JWT), exceto o que está em
+  `archbase.security.whitelist`** (`/actuator/health`, `/swagger-ui/**`, `/v3/api-docs/**`,
+  `/api/v1/public/**`).
+- Não há uso de `@PreAuthorize`, `@Secured` ou `@RolesAllowed` em nenhum lugar do código. O que
+  existe de Spring Security direto é o `AccessDeniedException`/`AuthenticationException` tratados no
+  `RestExceptionHandler`, o `SecurityContextHolder` lido no `TenantAccessValidationFilter` e o
+  `PasswordEncoder` usado pelo `AdminSeedLoader`.
+- `@RequireRole` **não é usado**, mas o boilerplate registra um `BoilerplateRoleResolver` e configura
+  `no-resolver-policy: deny` (ver abaixo).
+
+**Convenção recomendada para código novo:** prefira as anotações do Archbase (`@HasPermission` à
+frente), porque elas conversam com o modelo de permissões, o diagnóstico de acesso e a auditoria do
+framework. O boilerplate não proíbe `@PreAuthorize`; só não o usa, e nada no código ou no yml o
+bloqueia. Se misturar, lembre que a decisão do Archbase e a do Spring são independentes: um endpoint
+anotado só com `@PreAuthorize` não aparece no catálogo de permissões do Archbase.
+
+As anotações do Archbase:
 - `@HasPermission` - **a principal**: exige uma ação sobre um recurso
-- `@RequireRole` - Roles do sistema (leia a ressalva abaixo antes de usar)
-- `@RequireProfile` - Perfis de acesso
-- `@RequirePersona` - Personas em contexto
-
-**PROIBIDO**: `@PreAuthorize`, `@Secured`, `@RolesAllowed`
+- `@RequireRole` - roles de negócio da aplicação (leia a ressalva abaixo antes de usar)
+- `@RequireProfile` - perfis de acesso
+- `@RequirePersona` - personas em contexto
 
 ---
 
@@ -22,321 +40,308 @@ Anotações de segurança do Archbase Framework.
 aplicação, não ao Archbase — o framework não sabe o que é "ADMIN" no seu sistema. Para a anotação
 decidir alguma coisa, a aplicação precisa registrar um bean `ArchbaseRoleResolver`.
 
-**Sem esse bean, quem decide é uma chave cujo padrão é liberar:**
+**Sem esse bean, quem decide é uma chave cujo padrão do framework é liberar:**
 
 ```yaml
 archbase:
   security:
     require-role:
-      no-resolver-policy: permit   # padrão: passa. Use 'deny' para negar.
+      no-resolver-policy: permit   # padrão do framework: passa. Use 'deny' para negar.
 ```
 
-Ou seja: anotar um endpoint com `@RequireRole("ADMIN")` num projeto sem resolver o deixa **aberto a
-qualquer autenticado**, sem erro nem aviso. O código parece protegido e não está.
+Ou seja: anotar um endpoint com `@RequireRole("ADMIN")` num projeto sem resolver, e com a chave no
+padrão, o deixa **aberto a qualquer autenticado**, sem erro nem aviso. O código parece protegido e
+não está.
+
+**O que o boilerplate faz a respeito** (`application.yml` + `BoilerplateRoleResolver`):
+
+1. `archbase.security.require-role.no-resolver-policy: deny` — já vem endurecido.
+2. Registra `BoilerplateRoleResolver implements ArchbaseRoleResolver`, que devolve `Set.of()` em
+   `resolveRoles` e `false` em `isOwner`. Resultado: qualquer método com `@RequireRole` **nega** até
+   alguém implementar a consulta real de roles. É o oposto de liberar por omissão.
+3. Com `deny`, **apagar** o `BoilerplateRoleResolver` faz a aplicação recusar subir (o framework não
+   mantém uma proteção que não teria como funcionar). Para removê-lo, volte a chave para `permit`.
+
+Para usar `@RequireRole` de verdade, troque o corpo do resolver:
+
+```java
+package br.com.archbase.boilerplate.rest.infrastructure.config;
+
+import br.com.archbase.security.persistence.UserEntity;
+import br.com.archbase.security.spi.ArchbaseRoleResolver;
+import org.springframework.stereotype.Component;
+
+import java.util.Set;
+
+@Component
+public class BoilerplateRoleResolver implements ArchbaseRoleResolver {
+
+    @Override
+    public Set<String> resolveRoles(UserEntity user) {
+        return lojaRepository.findRolesDoUsuario(user.getId());   // consulta ao SEU modelo
+    }
+
+    @Override
+    public boolean isOwner(UserEntity user) {
+        return false;   // implemente ao usar @RequireRole(ownerOnly = true)
+    }
+}
+```
 
 Duas saídas, nesta ordem de preferência:
 
-1. **Use `@HasPermission`** (abaixo). Ele funciona com o modelo de permissões do próprio Archbase e
-   não depende de bean nenhum da aplicação.
-2. Se precisar mesmo de roles, **registre o `ArchbaseRoleResolver`** e considere
-   `no-resolver-policy: deny`, para que a ausência do bean falhe alto em vez de liberar em silêncio.
+1. **Use `@HasPermission`** (abaixo). Funciona com o modelo de permissões do próprio Archbase e não
+   depende de bean da aplicação.
+2. Se precisar de roles, **implemente o `ArchbaseRoleResolver`** e mantenha `no-resolver-policy: deny`.
 
 ---
 
 ## @HasPermission — o caminho padrão
 
-Exige uma **ação** sobre um **recurso**, que é como o Archbase modela permissão. Não depende de nada
-que a aplicação precise implementar.
+Exige uma **ação** sobre um **recurso**, que é como o Archbase modela permissão.
 
 ```java
 import br.com.archbase.security.annotation.HasPermission;   // 'annotation', no singular
 
 @RestController
-@RequestMapping("/api/v1/pedidos")
-public class PedidoController {
+@RequestMapping("/api/v1/produtos")
+public class ProdutoController {
 
-    @GetMapping
-    @HasPermission(action = "VIEW", resource = "PEDIDO", description = "Listar pedidos")
-    public ResponseEntity<List<PedidoDto>> listar() { ... }
+    @GetMapping("/ativos")
+    @HasPermission(action = "VIEW", resource = "PRODUTO", description = "Listar produtos ativos")
+    public ResponseEntity<List<ProdutoDTO>> buscarAtivos() { ... }
 
     @PostMapping
-    @HasPermission(action = "CREATE", resource = "PEDIDO", description = "Criar pedido")
-    public ResponseEntity<PedidoDto> criar(@RequestBody PedidoDto dto) { ... }
+    @HasPermission(action = "CREATE", resource = "PRODUTO", description = "Criar produto")
+    public ResponseEntity<ProdutoDTO> criar(@Valid @RequestBody ProdutoCreateDTO dto) { ... }
 }
 ```
 
-**Só em método.** `@HasPermission` é `@Target(METHOD)` — não compila na classe. As outras três
-aceitam classe, e nesse caso valem para todos os métodos, com a anotação de método sobrescrevendo a
-da classe.
+(Exemplo ilustrativo: o `ProdutoController` real **não** tem `@HasPermission`.)
 
-Repare no pacote: `@HasPermission` está em `...security.annotation` (singular) e as outras três em
-`...security.annotations` (plural). É fácil errar o import e não entender por que não compila.
+Atributos reais (verificados em `archbase-security-3.2.2`): `action` e `description` são obrigatórios;
+`resource`, `minimumLevel` (`AccessLevel`, padrão `NONE`), `tenantId`, `companyId` e `projectId` são
+opcionais.
+
+**Só em método.** `@HasPermission` é `@Target(METHOD)` — não compila na classe. `@RequireRole`,
+`@RequireProfile` e `@RequirePersona` aceitam `METHOD` e `TYPE`.
+
+**Pacotes diferentes** — é fácil errar o import:
+
+| Anotação | Pacote |
+|----------|--------|
+| `@HasPermission`, `@ArchbaseResource`, `@ArchbaseSecurityAdminEndpoint` | `br.com.archbase.security.annotation` (singular) |
+| `@RequireRole`, `@RequireProfile`, `@RequirePersona` | `br.com.archbase.security.annotations` (plural) |
+| `ArchbaseRoleResolver` | `br.com.archbase.security.spi` |
 
 ---
 
 ## @RequireRole
 
+`value` é **obrigatório** (`String[]`). Outros atributos: `requireAll` (padrão `false`, ou seja, basta
+uma das roles), `requirePlatformAdmin`, `ownerOnly`, `context`, `allowSystemAdmin` (padrão `true`) e
+`message`. Só funciona com `ArchbaseRoleResolver` implementado (ver ressalva).
+
 ```java
-package br.com.empresa.projeto.rest.infrastructure.input.rest;
-
 import br.com.archbase.security.annotations.RequireRole;
-import org.springframework.web.bind.annotation.*;
 
-@RestController
-@RequestMapping("/api/v1/admin/examples")
-public class AdminExampleController {
+@GetMapping
+@RequireRole({"ADMIN", "SUPERVISOR"})          // uma das duas basta
+public ResponseEntity<List<ExampleDTO>> findAll() { ... }
 
-    @GetMapping
-    @RequireRole({"ADMIN", "SUPERVISOR"})
-    public ResponseEntity<List<ExampleDTO>> findAll() {
-        // Apenas ADMIN e SUPERVISOR podem acessar
-    }
-
-    @DeleteMapping("/{id}")
-    @RequireRole("ADMIN")
-    public void delete(@PathVariable String id) {
-        // Apenas ADMIN pode deletar
-    }
-
-    @PostMapping
-    @RequireRole(value = {"ADMIN", "GERENTE", "SUPERVISOR"})
-    public ResponseEntity<ExampleDTO> create(@RequestBody CreateExampleDTO dto) {
-        // ADMIN, GERENTE ou SUPERVISOR podem criar
-    }
-}
+@DeleteMapping("/{id}")
+@RequireRole(value = {"ADMIN", "GERENTE"}, requireAll = true)   // as duas
+public void delete(@PathVariable String id) { ... }
 ```
 
 ---
 
 ## @RequireProfile
 
+`value` obrigatório. Outros: `requireAll`, `resource`, `action`, `allowSystemAdmin`,
+`requireActiveUser` (padrão `true`), `message`.
+
 ```java
-@RestController
-@RequestMapping("/api/v1/examples")
-public class ExampleController {
+import br.com.archbase.security.annotations.RequireProfile;
 
-    @PostMapping
-    @RequireProfile("MANAGER")
-    public ResponseEntity<ExampleDTO> create(@RequestBody CreateExampleDTO dto) {
-        // Apenas users com profile MANAGER
-    }
+@PostMapping
+@RequireProfile("MANAGER")
+public ResponseEntity<ExampleDTO> create(@RequestBody CreateExampleDTO dto) { ... }
 
-    @GetMapping("/relatorio")
-    @RequireProfile({"MANAGER", "ANALYST"})
-    public ResponseEntity<RelatorioDTO> gerarRelatorio() {
-        // MANAGER ou ANALYST
-    }
-}
+@GetMapping("/relatorio")
+@RequireProfile({"MANAGER", "ANALYST"})        // MANAGER ou ANALYST
+public ResponseEntity<RelatorioDTO> gerarRelatorio() { ... }
 ```
 
 ---
 
 ## @RequirePersona
 
+`value` obrigatório. Outros: `requireAll`, `context`, `contextData`, `allowSystemAdmin`,
+`requireActiveUser`, `ownerOnly`, `resource`, `action`, `message`.
+
 ```java
-@RestController
-@RequestMapping("/api/v1/system")
-public class SystemController {
+import br.com.archbase.security.annotations.RequirePersona;
 
-    @DeleteMapping("/{id}")
-    @RequirePersona(value = "ADMIN", context = "SYSTEM")
-    public void delete(@PathVariable String id) {
-        // Apenas ADMIN no contexto SYSTEM
-    }
-
-    @PostMapping("/reset")
-    @RequirePersona(value = "SUPERVISOR", context = "TENANT")
-    public void reset() {
-        // SUPERVISOR no contexto TENANT
-    }
-}
+@DeleteMapping("/{id}")
+@RequirePersona(value = "ADMIN", context = "SYSTEM")
+public void delete(@PathVariable String id) { ... }
 ```
 
 ---
 
-## Combinação de Anotações
+## Combinação e nível de classe
 
-```java
-@RestController
-@RequestMapping("/api/v1/examples")
-public class ExampleController {
-
-    @PostMapping
-    @RequireRole({"ADMIN", "GERENTE"})
-    @RequireProfile("MANAGER")
-    public ResponseEntity<ExampleDTO> create(@RequestBody CreateExampleDTO dto) {
-        // Precisa ter role E profile
-    }
-
-    @GetMapping("/sensiveis")
-    @RequireRole("ADMIN")
-    @RequirePersona(value = "ADMIN", context = "SYSTEM")
-    public ResponseEntity<List<DadoSensivelDTO>> getDadosSensiveis() {
-        // Múltiplas condições (todas devem ser satisfeitas)
-    }
-}
-```
-
----
-
-## Nível de Método vs Classe
+Anotações de classe (`@RequireRole`, `@RequireProfile`, `@RequirePersona`) valem para todos os métodos
+do controller; a de método a sobrescreve. Combinar mais de uma no mesmo método exige que todas sejam
+satisfeitas.
 
 ```java
 @RestController
 @RequestMapping("/api/v1/admin")
-@RequireRole("ADMIN")  // Todos os métodos requerem ADMIN
+@RequireRole("ADMIN")                      // todos os métodos
 public class AdminController {
 
-    @GetMapping
-    public ResponseEntity<List<ExampleDTO>> findAll() {
-        // Herda @RequireRole("ADMIN") da classe
-    }
-
-    @GetMapping("/publico")
-    @RequireRole  // Sobrescreve - endpoint público
-    public ResponseEntity<String> publicEndpoint() {
-        // Qualquer um pode acessar
-    }
-
     @DeleteMapping("/{id}")
-    @RequireRole({"ADMIN", "SUPER_ADMIN"})  // Sobrescreve com roles específicos
-    public void delete(@PathVariable String id) {
-        // ADMIN ou SUPER_ADMIN
-    }
+    @RequireRole({"ADMIN", "SUPER_ADMIN"}) // sobrescreve a da classe
+    public void delete(@PathVariable String id) { ... }
 }
 ```
 
+Não existe forma de "esvaziar" `@RequireRole` para tornar um método público (`value` é obrigatório).
+Endpoint público se declara na `archbase.security.whitelist`, não por anotação.
+
 ---
 
-## Configuração application.yml
+## Configuração real: `archbase.security.*` (application.yml)
+
+O `application.yml` do boilerplate já nasce endurecido. Resumo do que está lá:
 
 ```yaml
 archbase:
   security:
     jwt:
-      secret-key: ${JWT_SECRET:change-this-secret-key}
+      secret-key: ${ARCHBASE_JWT_SECRET:change-this-secret-key-in-production}  # validado, ver 14
       token-expiration: 86400000
       refresh-expiration: 604800000
-    scan-packages: br.com.empresa.projeto.rest.infrastructure.input.rest
+      strict-token-use: true            # recusa token sem o claim token_use
+      accept-token-query-param: false   # nada de ?token=
+    scan-packages: br.com.archbase.boilerplate.rest.infrastructure.input.rest
     whitelist: /actuator/health,/swagger-ui/**,/v3/api-docs/**,/api/v1/public/**
+    prevent-user-enumeration: true      # recuperação de senha responde igual p/ qualquer e-mail
+    password-change:
+      revoke-sessions: true
+    require-role:
+      no-resolver-policy: deny
+    public-paths:
+      actuator: false
+      registration: false               # sem auto-cadastro anônimo
+      legacy-app-routes: false
+    admin-guard:
+      enabled: true
+      allow-unverifiable-principal: false
+    admin-endpoints:
+      policy: permit                    # de propósito, por causa do archbase-react (ver comentário no yml)
+    api-token:
+      hash-enabled: true
+      purge-plaintext: false            # irreversível; ligar só depois
+    client-ip:
+      trust-forwarded-for: false        # só ligue com proxy que sobrescreva X-Forwarded-For
+    password:
+      min-length: 12
+      require-digit: true
+      require-uppercase: true
+      require-lowercase: true
+      require-special: true
+      block-common: true
+    hardening:
+      validation: fail                  # recusa subir se alguma proteção ligada não puder funcionar
     cors:
-      allowed-origins: ${CORS_ORIGINS:http://localhost:3000}
+      allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:4200}
       allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
-      allowed-headers: Authorization,Content-Type,Accept
+      allowed-headers: Authorization,Content-Type,Accept,X-Requested-With,X-Device-ID,X-App-Version,X-TENANT-ID,X-Tenant-Id
+      allow-credentials: true
 ```
 
-**CORS tem uma fonte só.** É esta. Não crie um `CorsFilter` na aplicação: ele competiria com o do
-framework, e duas regras para a mesma coisa divergem no primeiro dia em que alguém edita só uma.
+Cuidados:
+- **CORS tem uma fonte só**: `archbase.security.cors`. Não crie um `CorsFilter` na aplicação — ele
+  competiria com o do framework. (O boilerplate já removeu o bloco `application.security.*`, que
+  ninguém lia.)
+- **`admin-endpoints.policy: permit`** significa que qualquer autenticado alcança endpoints
+  administrativos do framework, incluindo `POST /api/v1/user`. O valor seguro é `admin-only`, mas ele
+  derruba o auto-registro de recursos do `archbase-react` (`POST /api/v1/resource/register`) para
+  não-administradores. Se o projeto não usa archbase-react, troque para `admin-only`.
+- **`strict-token-use: true`** só é seguro num projeto novo; em projeto com tokens já emitidos, ligar
+  depois que o maior `refresh-expiration` passar.
+- A política de senha (`password.*`) tem defaults do framework todos desligados; o teste
+  `AplicacaoSobeTest` falha se as chaves forem apagadas (ver `14-infraestrutura.md`).
+- O segredo do JWT é conferido na subida pelo `SegredoJwtValidator` (ver `14-infraestrutura.md`).
 
-### Chaves que costumam ser esquecidas
+### Chaves do framework que o boilerplate NÃO define (existem no `archbase-security`)
 
 ```yaml
 archbase:
   security:
-    # Confere o esquema de segurança na subida e cria o que falta (tabelas e colunas que uma versão
-    # nova do framework passou a exigir). Só comandos aditivos; nunca remove nada.
     schema:
-      mode: apply          # apply | report | off
-    # Tela de diagnóstico de acesso: árvore de quem tem o quê, panorama e simulação.
-    # SEM esta chave o controller nem é registrado e a tela responde 404 — não 403.
+      mode: apply          # apply | report | off — confere/cria o que falta do esquema de segurança
     diagnostics:
-      enabled: true
-    # Trilha de auditoria: quem alterou permissão, quem entrou, quem teve acesso negado.
-    # Ligue DEPOIS de garantir que as tabelas existem (ver abaixo).
+      enabled: true        # tela de diagnóstico de acesso; sem a chave o controller nem é registrado (404)
     audit:
-      enabled: false
+      enabled: false       # trilha de auditoria; ligue só depois de garantir as tabelas
 ```
 
-### Se o projeto sobe com `hibernate.ddl-auto: validate`
-
-Duas tabelas precisam existir **antes** do boot, mesmo com a trilha desligada: `seguranca_evento` e
-`seguranca_revisao`. São entidades JPA comuns, então o Hibernate as exige na validação — e a rotina
-de `schema.mode` não ajuda aqui, porque roda **depois** que o `EntityManagerFactory` sobe.
-
-Sintoma: `Schema validation: missing table [seguranca_evento]`, e a aplicação não sobe.
-
-O DDL está em `deployment/sql/` no repositório do framework.
+Se `audit.enabled` for ligado, as tabelas `_AUD` são necessárias: não estão na `V1__schema_inicial.sql`
+(o DDL está em `deployment/sql/` no repositório do framework). Já `seguranca_evento` e
+`seguranca_revisao` **estão** na V1, porque com `ddl-auto: validate` (perfil `prod`) o Hibernate as
+exige mesmo com a trilha desligada.
 
 ---
 
-## Obter Usuário Autenticado
+## Usuário autenticado e verificação programática
+
+O boilerplate tem um `SecurityService` próprio (`@Service("securityService")`, em
+`br.com.archbase.boilerplate.core.application.service.security`). Ele **não** é do Archbase: é código
+do projeto, para uso programático. Métodos existentes: `hasRole`, `hasProfile`, `isAdmin`,
+`isOwner`, `isOwnerOrAdmin`, `anyOf`, `allOf`, `getCurrentUser`, `getCurrentUserId`,
+`getCurrentUsername`, `getCurrentUserName`, `getCurrentTenantId`, `getCurrentRole`,
+`getCurrentProfile`, `canAccessTenant`, `canAccessTenantOrAdmin`, `isAuthenticated`.
 
 ```java
-@RestController
-@RequestMapping("/api/v1/me")
-public class MeController {
+import br.com.archbase.boilerplate.core.application.service.security.SecurityService;
 
-    @GetMapping
-    public ResponseEntity<UserDTO> getMe() {
-        // Usar Archbase Security Context
-        String userId = ArchbaseSecurityContext.getCurrentUserId();
-        String tenantId = ArchbaseSecurityContext.getCurrentTenantId();
-
-        return ResponseEntity.ok(userService.findById(userId));
-    }
-}
-```
-
----
-
-## Verificar Roles Programaticamente
-
-```java
 @Service
 @RequiredArgsConstructor
 public class ExampleService {
 
-    private final ArchbaseSecurityService securityService;
+    private final SecurityService securityService;
 
     public void realizarAcao() {
-        if (securityService.hasRole("ADMIN")) {
-            // Lógica específica para ADMIN
-        }
-
-        if (securityService.hasProfile("MANAGER")) {
-            // Lógica para MANAGER
-        }
-
-        String currentRole = securityService.getCurrentRole();
-        String currentProfile = securityService.getCurrentProfile();
+        if (securityService.isAdmin()) { /* lógica de admin */ }
+        String userId = securityService.getCurrentUserId();
+        String tenantId = securityService.getCurrentTenantId();
     }
 }
 ```
 
----
+No lado do framework (verificado em `archbase-security` 3.2.2):
 
-## Roles Comuns
+- `br.com.archbase.security.service.ArchbaseSecurityService` — `hasPermission(Authentication, action,
+  resource, tenantId, companyId, projectId)` e `decide(...)`, que devolve `AccessDecision`.
+- `SecurityContextHolder.getContext().getAuthentication()`, como faz o `TenantAccessValidationFilter`.
+- Tenant atual: `br.com.archbase.ddd.context.ArchbaseTenantContext.getTenantId()`.
 
-| Role | Descrição |
-|------|-----------|
-| `ADMIN` | Administrador do sistema |
-| `SUPERVISOR` | Supervisor de área |
-| `GERENTE` | Gerente |
-| `USUARIO` | Usuário padrão |
-| `CONVIDADO` | Acesso limitado |
-
----
-
-## Profiles Comuns
-
-| Profile | Descrição |
-|---------|-----------|
-| `ADMIN` | Administrativo |
-| `MANAGER` | Gerencial |
-| `USER` | Usuário final |
-| `ANALYST` | Analista |
-| `OPERATOR` | Operador |
+> Versões anteriores desta skill citavam `ArchbaseSecurityContext` e `ArchbaseSecurityService.hasRole`.
+> Não existem em `archbase-security` 3.2.2 (a classe `ArchbaseSecurityContext` não foi encontrada nos
+> jars). `hasRole`/`hasProfile` existem apenas no `SecurityService` do próprio boilerplate.
 
 ---
 
-## Tabela Comparativa
+## Primeiro administrador
 
-| ERRADO | CORRETO |
-|--------|---------|
-| `@PreAuthorize("hasRole('ADMIN')")` | `@RequireRole("ADMIN")` |
-| `@Secured("ROLE_ADMIN")` | `@RequireRole("ADMIN")` |
-| `@RolesAllowed("ADMIN")` | `@RequireRole("ADMIN")` |
-| `if (request.isUserInRole("ADMIN"))` | `securityService.hasRole("ADMIN")` |
+Banco novo não tem usuário, e todas as rotas exigem autenticação. O `AdminSeedLoader` resolve isso
+(ver `14-infraestrutura.md`): cria `admin@archbase.com.br` quando não existe nenhum usuário; senha
+`admin` em `dev`/`h2`, aleatória no log nos demais perfis, ou a de
+`archbase.boilerplate.seed.admin.password`.
 
 ---
 
@@ -344,12 +349,9 @@ public class ExampleService {
 
 | Prática | Descrição |
 |---------|-----------|
-| **@RequireRole** | Para autorização por role |
-| **@RequireProfile** | Para perfis de acesso |
-| **@RequirePersona** | Para personas em contexto específico |
-| **Whitelist** | Configurar endpoints públicos no yml |
-| **NUNCA @PreAuthorize** | Use anotações Archbase |
-
----
-
-**CRÍTICO**: Apenas anotações Archbase funcionam corretamente com a infraestrutura de multi-tenancy.
+| **@HasPermission** | Caminho padrão para autorização por ação/recurso |
+| **@RequireRole** | Só com `ArchbaseRoleResolver` real e `no-resolver-policy: deny` |
+| **Whitelist** | Endpoints públicos declarados em `archbase.security.whitelist` |
+| **@SecurityRequirement** | Só documenta no Swagger; não autoriza |
+| **CORS** | Uma fonte: `archbase.security.cors` |
+| **Testar como não-admin** | Antes de afrouxar qualquer flag de endurecimento |
