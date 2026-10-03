@@ -1,6 +1,9 @@
 package br.com.archbase.boilerplate.rest.infrastructure.filter;
 
 import br.com.archbase.boilerplate.rest.infrastructure.config.RateLimitingConfig;
+import br.com.archbase.boilerplate.rest.infrastructure.error.ApiErrorWriter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +30,8 @@ class RateLimitingFilterTest {
 
     // webhook 2/min, autenticado 3/min, ip 2/min
     private RateLimitingFilter filter(boolean enabled) {
-        return new RateLimitingFilter(new RateLimitingConfig(enabled, 2, 60, 3, 60, 2, 60));
+        return new RateLimitingFilter(new RateLimitingConfig(enabled, 2, 60, 3, 60, 2, 60),
+                new ApiErrorWriter(new ObjectMapper().registerModule(new JavaTimeModule())));
     }
 
     private MockHttpServletResponse chamar(RateLimitingFilter f, String path, String ip) throws Exception {
@@ -47,6 +51,9 @@ class RateLimitingFilterTest {
 
         assertThat(terceira.getStatus()).isEqualTo(429);
         assertThat(Long.parseLong(terceira.getHeader("Retry-After"))).isPositive();
+        assertThat(terceira.getContentType()).startsWith("application/json");
+        assertThat(terceira.getContentAsString())
+                .contains("\"status\":\"TOO_MANY_REQUESTS\"", "\"path\":\"/api/v1/produtos\"");
         verify(chain, times(2)).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 

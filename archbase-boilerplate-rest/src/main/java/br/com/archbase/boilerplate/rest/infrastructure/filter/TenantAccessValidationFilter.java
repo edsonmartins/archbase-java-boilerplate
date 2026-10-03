@@ -1,6 +1,7 @@
 package br.com.archbase.boilerplate.rest.infrastructure.filter;
 
 import br.com.archbase.ddd.context.ArchbaseTenantContext;
+import br.com.archbase.boilerplate.rest.infrastructure.error.ApiErrorWriter;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,7 +9,9 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,7 +28,10 @@ import java.io.IOException;
 @Component
 @Order(2)
 @Slf4j
+@RequiredArgsConstructor
 public class TenantAccessValidationFilter implements Filter {
+
+    private final ApiErrorWriter apiErrorWriter;
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -40,7 +46,7 @@ public class TenantAccessValidationFilter implements Filter {
             if (!hasAccessToTenant(authentication, requestedTenantId)) {
                 log.warn("Acesso negado: usuário {} tentou acessar tenant {}",
                         authentication.getName(), requestedTenantId);
-                httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN,
+                apiErrorWriter.write(httpRequest, httpResponse, HttpStatus.FORBIDDEN,
                         "Acesso negado ao tenant solicitado");
                 return;
             }

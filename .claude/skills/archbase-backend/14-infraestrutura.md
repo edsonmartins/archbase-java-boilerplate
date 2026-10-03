@@ -101,7 +101,9 @@ Exemplo de resposta de validação:
 ```
 
 Para tratar uma exceção nova, adicione um `@ExceptionHandler` no `RestExceptionHandler` e use o
-`buildResponseEntity(ApiError)`. Não crie um segundo `@ControllerAdvice`. O campo `path` do
+`buildResponseEntity(ApiError)`. Não crie um segundo `@ControllerAdvice`. Filtros servlet nunca chegam ao
+handler: para responder erro de dentro de um filtro use `ApiErrorWriter.write(request, response, status, mensagem)`
+(`error/ApiErrorWriter.java`), nunca `sendError`. O campo `path` do
 `ApiError` é preenchido pelo próprio `buildResponseEntity` com o `getRequestURI()` da requisição em curso
 (sem query string); por isso todo handler novo o recebe sem código extra. Coberto por
 `RestExceptionHandlerTest`.
@@ -120,8 +122,7 @@ faz `ArchbaseTenantContext.clear()`.
 
 **`TenantAccessValidationFilter`** (`@Order(2)`): para requisições autenticadas, fora de
 `/actuator`, `/swagger-ui`, `/v3/api-docs` e `/api/v1/public`, compara o tenant do contexto com o
-`getTenantId()` do principal (via reflection). Responde **403** com `httpResponse.sendError(...)` (ou seja,
-**não** passa pelo `RestExceptionHandler`/`ApiError`) quando forem diferentes e também quando o tenant do
+`getTenantId()` do principal (via reflection). Responde **403** com um `ApiError` em JSON (via `ApiErrorWriter`) quando forem diferentes e também quando o tenant do
 usuário não puder ser determinado (principal ausente, sem `getTenantId`, tenant em branco ou erro na
 reflection): o filtro **falha fechado**. Só não valida quando não há tenant no contexto ou a requisição
 não está autenticada (a autorização fica a cargo da cadeia do Spring Security). Coberto por
@@ -217,7 +218,7 @@ security:
     ip:            { limit: 50,   duration: 60 }    # duration em segundos
 ```
 
-O 429 também não passa pelo `RestExceptionHandler`/`ApiError`. Coberto por `RateLimitingFilterTest`.
+O 429 também sai como `ApiError`. Coberto por `RateLimitingFilterTest`.
 
 ---
 

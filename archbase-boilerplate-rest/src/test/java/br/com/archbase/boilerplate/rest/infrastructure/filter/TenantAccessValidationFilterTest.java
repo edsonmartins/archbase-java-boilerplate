@@ -1,6 +1,9 @@
 package br.com.archbase.boilerplate.rest.infrastructure.filter;
 
+import br.com.archbase.boilerplate.rest.infrastructure.error.ApiErrorWriter;
 import br.com.archbase.ddd.context.ArchbaseTenantContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +28,8 @@ class TenantAccessValidationFilterTest {
         }
     }
 
-    private final TenantAccessValidationFilter filter = new TenantAccessValidationFilter();
+    private final TenantAccessValidationFilter filter = new TenantAccessValidationFilter(
+            new ApiErrorWriter(new ObjectMapper().registerModule(new JavaTimeModule())));
     private final FilterChain chain = mock(FilterChain.class);
     private MockHttpServletRequest request;
     private MockHttpServletResponse response;
@@ -61,6 +65,9 @@ class TenantAccessValidationFilterTest {
         filter.doFilter(request, response, chain);
         verify(chain, never()).doFilter(request, response);
         assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.getContentAsString())
+                .contains("\"status\":\"FORBIDDEN\"", "\"path\":\"/api/v1/produtos\"",
+                        "Acesso negado ao tenant solicitado");
     }
 
     @Test

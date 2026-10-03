@@ -1,6 +1,7 @@
 package br.com.archbase.boilerplate.rest.infrastructure.filter;
 
 import br.com.archbase.boilerplate.rest.infrastructure.config.RateLimitingConfig;
+import br.com.archbase.boilerplate.rest.infrastructure.error.ApiErrorWriter;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.ConsumptionProbe;
 import jakarta.servlet.FilterChain;
@@ -10,6 +11,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -17,7 +19,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Aplica os limites de {@link RateLimitingConfig}: webhooks e requisições anônimas por IP,
@@ -37,6 +38,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private static final String WEBHOOK_PREFIX = "/api/v1/webhooks";
 
     private final RateLimitingConfig config;
+    private final ApiErrorWriter apiErrorWriter;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -63,13 +65,9 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         long retryAfterSeconds = Math.max(1, (probe.getNanosToWaitForRefill() + 999_999_999L) / 1_000_000_000L);
         log.warn("Rate limit excedido: {} {} de {}", request.getMethod(), request.getRequestURI(),
                 request.getRemoteAddr());
-        response.setStatus(429);
         response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
-        response.setContentType("application/json");
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write(
-                "{\"status\":429,\"message\":\"Limite de requisições excedido. Tente novamente em "
-                        + retryAfterSeconds + "s\"}");
+        apiErrorWriter.write(request, response, HttpStatus.TOO_MANY_REQUESTS,
+                "Limite de requisições excedido. Tente novamente em " + retryAfterSeconds + "s");
     }
 
     private Bucket resolveBucket(HttpServletRequest request) {
