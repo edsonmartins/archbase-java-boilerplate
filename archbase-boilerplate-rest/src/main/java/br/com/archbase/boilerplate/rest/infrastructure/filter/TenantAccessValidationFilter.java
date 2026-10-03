@@ -75,38 +75,47 @@ public class TenantAccessValidationFilter implements Filter {
                 path.startsWith("/api/v1/public");
     }
 
+    /**
+     * Falha fechada: só libera quando o tenant do usuário pôde ser lido e é igual ao solicitado.
+     * Principal ausente, sem {@code getTenantId}, com tenant em branco ou erro na leitura negam o
+     * acesso — liberar nesses casos deixaria qualquer usuário autenticado ler outro tenant bastando
+     * trocar o header X-TENANT-ID.
+     */
     private boolean hasAccessToTenant(Authentication authentication, String requestedTenantId) {
         Object principal = authentication.getPrincipal();
 
         if (principal == null) {
-            return true;
+            log.warn("Usuário {} sem principal; negando acesso ao tenant {}",
+                    authentication.getName(), requestedTenantId);
+            return false;
         }
 
-        // Tenta obter o tenant do principal usando reflection para ser compatível
-        // com diferentes implementações de UserDetails
+        // Reflection para ser compatível com diferentes implementações de UserDetails
+        // (o UserEntity do archbase-security expõe getTenantId).
+        String userTenantId;
         try {
-            var method = principal.getClass().getMethod("getTenantId");
-            String userTenantId = (String) method.invoke(principal);
-
-            if (userTenantId == null || userTenantId.isBlank()) {
-                log.debug("Usuário {} não possui tenant associado, permitindo acesso",
-                        authentication.getName());
-                return true;
-            }
-
-            boolean hasAccess = userTenantId.equals(requestedTenantId);
-            if (!hasAccess) {
-                log.debug("Usuário {} pertence ao tenant {}, mas solicitou acesso ao tenant {}",
-                        authentication.getName(), userTenantId, requestedTenantId);
-            }
-            return hasAccess;
+            userTenantId = (String) principal.getClass().getMethod("getTenantId").invoke(principal);
         } catch (NoSuchMethodException e) {
-            // Se não tem método getTenantId, permite acesso
-            log.debug("Principal não possui método getTenantId, permitindo acesso");
-            return true;
+            log.warn("Principal {} não possui getTenantId; negando acesso ao tenant {}",
+                    principal.getClass().getName(), requestedTenantId);
+            return false;
         } catch (Exception e) {
-            log.warn("Erro ao verificar tenant do usuário: {}", e.getMessage());
-            return true;
+            log.warn("Erro ao verificar tenant do usuário {}; negando acesso: {}",
+                    authentication.getName(), e.getMessage());
+            return false;
         }
+
+        if (userTenantId == null || userTenantId.isBlank()) {
+            log.warn("Usuário {} não possui tenant associado; negando acesso ao tenant {}",
+                    authentication.getName(), requestedTenantId);
+            return false;
+        }
+
+        boolean hasAccess = userTenantId.equals(requestedTenantId);
+        if (!hasAccess) {
+            log.debug("Usuário {} pertence ao tenant {}, mas solicitou acesso ao tenant {}",
+                    authentication.getName(), userTenantId, requestedTenantId);
+        }
+        return hasAccess;
     }
 }

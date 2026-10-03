@@ -118,10 +118,12 @@ faz `ArchbaseTenantContext.clear()`.
 
 **`TenantAccessValidationFilter`** (`@Order(2)`): para requisições autenticadas, fora de
 `/actuator`, `/swagger-ui`, `/v3/api-docs` e `/api/v1/public`, compara o tenant do contexto com o
-`getTenantId()` do principal (via reflection). Se forem diferentes, responde **403** com
-`httpResponse.sendError(...)` (ou seja, **não** passa pelo `RestExceptionHandler`/`ApiError`). Casos
-em que **permite** o acesso: sem tenant no contexto, principal sem `getTenantId`, usuário sem
-tenant, ou erro na reflection — o filtro é permissivo por desenho.
+`getTenantId()` do principal (via reflection). Responde **403** com `httpResponse.sendError(...)` (ou seja,
+**não** passa pelo `RestExceptionHandler`/`ApiError`) quando forem diferentes e também quando o tenant do
+usuário não puder ser determinado (principal ausente, sem `getTenantId`, tenant em branco ou erro na
+reflection): o filtro **falha fechado**. Só não valida quando não há tenant no contexto ou a requisição
+não está autenticada (a autorização fica a cargo da cadeia do Spring Security). Coberto por
+`TenantAccessValidationFilterTest`.
 
 Chaves relacionadas em `application.yml`:
 
