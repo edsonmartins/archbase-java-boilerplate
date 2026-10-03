@@ -1,340 +1,223 @@
 # 03. DTOs e Validações
 
-Data Transfer Objects para entrada e saída de dados da API.
+Data Transfer Objects para entrada e saída de dados da API. Exemplos reais: `ProdutoDTO`, `ProdutoCreateDTO`,
+`ProdutoUpdateDTO`, `ProdutoEstatisticasDTO`, em `br.com.archbase.boilerplate.core.application.dto`.
 
 ---
 
 ## Conceito
 
-**CRÍTICO**: DTOs servem para:
+DTOs servem para:
 - Transferir dados entre camadas
-- Validar entrada do usuário
-- Ocultar entidades internas
-- Controlar exposição de dados
+- Validar entrada do usuário (Bean Validation `jakarta.validation`)
+- Não expor a entidade JPA na API
+- Controlar o que entra e o que sai
+
+Padrão Lombok dos DTOs do boilerplate: `@Data`, `@Builder`, `@NoArgsConstructor`, `@AllArgsConstructor`.
+Os DTOs atuais não usam `@Schema` do OpenAPI (a documentação fica em `@Operation`/`@Parameter` no controller).
 
 ---
 
-## DTO de Resposta
+## DTO de Resposta (ProdutoDTO)
+
+Inclui os campos de auditoria/tenant herdados da base da entidade e os campos de negócio:
 
 ```java
-package br.com.empresa.projeto.core.application.dto;
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProdutoDTO {
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
-
-@Schema(description = "DTO de resposta de Example")
-public class ExampleDTO {
-
-    @Schema(description = "ID do exemplo")
     private String id;
+    private String code;
+    private Long version;
 
-    @Schema(description = "Nome do exemplo")
-    private String nome;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime createEntityDate;
 
-    @Schema(description = "Descrição do exemplo")
-    private String descricao;
+    private String createdByUser;
 
-    @Schema(description = "Status ativo")
-    private Boolean ativo;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime updateEntityDate;
 
-    @Schema(description = "Data de criação")
-    private LocalDateTime dataCriacao;
-
-    @Schema(description = "ID do tenant")
+    private String lastModifiedByUser;
     private String tenantId;
 
-    // Getters e Setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    // Campos de negócio
+    private String nome;
+    private String descricao;
+    private BigDecimal preco;
+    private Integer estoque;
+    private CategoriaProduto categoria;
+    private Boolean ativo;
+    private String sku;
+    private String marca;
+    private String urlImagem;
+    private Boolean destaque;
 
-    public String getNome() { return nome; }
-    public void setNome(String nome) { this.nome = nome; }
-
-    public String getDescricao() { return descricao; }
-    public void setDescricao(String descricao) { this.descricao = descricao; }
-
-    public Boolean getAtivo() { return ativo; }
-    public void setAtivo(Boolean ativo) { this.ativo = ativo; }
-
-    public LocalDateTime getDataCriacao() { return dataCriacao; }
-    public void setDataCriacao(LocalDateTime dataCriacao) { this.dataCriacao = dataCriacao; }
-
-    public String getTenantId() { return tenantId; }
-    public void setTenantId(String tenantId) { this.tenantId = tenantId; }
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    private LocalDateTime dataCadastro;
 }
 ```
 
 ---
 
-## DTO de Criação
+## DTO de Criação (ProdutoCreateDTO)
 
 ```java
-package br.com.empresa.projeto.core.application.dto;
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProdutoCreateDTO {
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-
-@Schema(description = "DTO para criação de Example")
-public class CreateExampleDTO {
-
-    @NotBlank(message = "Nome é obrigatório")
-    @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
-    @Schema(description = "Nome do exemplo", example = "Exemplo Teste", required = true)
+    @NotBlank(message = "O nome e obrigatorio")
+    @Size(min = 2, max = 200, message = "O nome deve ter entre 2 e 200 caracteres")
     private String nome;
 
-    @Size(max = 500, message = "Descrição deve ter no máximo 500 caracteres")
-    @Schema(description = "Descrição do exemplo", example = "Descrição detalhada")
+    @Size(max = 1000, message = "A descricao deve ter no maximo 1000 caracteres")
     private String descricao;
 
-    @Schema(description = "Status ativo", example = "true")
-    private Boolean ativo = true;
+    @NotNull(message = "O preco e obrigatorio")
+    @Positive(message = "O preco deve ser maior que zero")
+    @Digits(integer = 8, fraction = 2, message = "O preco deve ter no maximo 8 digitos inteiros e 2 decimais")
+    private BigDecimal preco;
 
-    // Getters e Setters
-    public String getNome() { return nome; }
-    public void setNome(String nome) { this.nome = nome; }
+    @PositiveOrZero(message = "O estoque nao pode ser negativo")
+    private Integer estoque;
 
-    public String getDescricao() { return descricao; }
-    public void setDescricao(String descricao) { this.descricao = descricao; }
+    @NotNull(message = "A categoria e obrigatoria")
+    private CategoriaProduto categoria;
 
-    public Boolean getAtivo() { return ativo; }
-    public void setAtivo(Boolean ativo) { this.ativo = ativo; }
+    @Size(max = 100, message = "O SKU deve ter no maximo 100 caracteres")
+    private String sku;
+
+    @Size(max = 100, message = "A marca deve ter no maximo 100 caracteres")
+    private String marca;
+
+    @Size(max = 500, message = "A URL da imagem deve ter no maximo 500 caracteres")
+    private String urlImagem;
+
+    private Boolean destaque;
 }
 ```
 
+Os limites de `@Size` espelham o `length` das colunas em `ProdutoEntity` (nome 200, descrição 1000, sku 100,
+marca 100, url_imagem 500); `@Digits(integer = 8, fraction = 2)` cabe no `numeric(10,2)` do preço. Mantenha os dois
+lados alinhados. As mensagens do boilerplate estão sem acento.
+
 ---
 
-## DTO de Atualização
+## DTO de Atualização (ProdutoUpdateDTO)
+
+Atualização parcial: todos os campos são opcionais (sem `@NotNull`/`@NotBlank`); a validação só vale quando o campo
+vem preenchido. Campos nulos são ignorados pelo service. Os getters são os do Lombok, não `Optional`.
 
 ```java
-package br.com.empresa.projeto.core.application.dto;
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProdutoUpdateDTO {
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Size;
-
-import java.util.Optional;
-
-@Schema(description = "DTO para atualização de Example")
-public class UpdateExampleDTO {
-
-    @Size(min = 3, max = 100, message = "Nome deve ter entre 3 e 100 caracteres")
-    @Schema(description = "Nome do exemplo")
+    @Size(min = 2, max = 200, message = "O nome deve ter entre 2 e 200 caracteres")
     private String nome;
 
-    @Size(max = 500, message = "Descrição deve ter no máximo 500 caracteres")
-    @Schema(description = "Descrição do exemplo")
+    @Size(max = 1000, message = "A descricao deve ter no maximo 1000 caracteres")
     private String descricao;
 
-    @Schema(description = "Status ativo")
+    @Positive(message = "O preco deve ser maior que zero")
+    @Digits(integer = 8, fraction = 2, message = "O preco deve ter no maximo 8 digitos inteiros e 2 decimais")
+    private BigDecimal preco;
+
+    @PositiveOrZero(message = "O estoque nao pode ser negativo")
+    private Integer estoque;
+
+    private CategoriaProduto categoria;
     private Boolean ativo;
 
-    // Getters e Setters
-    public Optional<String> getNome() { return Optional.ofNullable(nome); }
-    public void setNome(String nome) { this.nome = nome; }
+    @Size(max = 100, message = "O SKU deve ter no maximo 100 caracteres")
+    private String sku;
 
-    public Optional<String> getDescricao() { return Optional.ofNullable(descricao); }
-    public void setDescricao(String descricao) { this.descricao = descricao; }
+    @Size(max = 100, message = "A marca deve ter no maximo 100 caracteres")
+    private String marca;
 
-    public Optional<Boolean> getAtivo() { return Optional.ofNullable(ativo); }
-    public void setAtivo(Boolean ativo) { this.ativo = ativo; }
+    @Size(max = 500, message = "A URL da imagem deve ter no maximo 500 caracteres")
+    private String urlImagem;
+
+    private Boolean destaque;
 }
 ```
 
 ---
 
-## DTO Paginado
+## DTO de Estatísticas (ProdutoEstatisticasDTO)
+
+DTO de leitura com agregados, só campos e Lombok:
 
 ```java
-package br.com.empresa.projeto.core.application.dto;
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProdutoEstatisticasDTO {
 
-import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.data.domain.Page;
-
-import java.util.List;
-
-@Schema(description = "DTO de resposta paginada")
-public class PageResponseDTO<T> {
-
-    @Schema(description = "Conteúdo da página")
-    private List<T> content;
-
-    @Schema(description = "Número da página atual")
-    private int pageNumber;
-
-    @Schema(description = "Tamanho da página")
-    private int pageSize;
-
-    @Schema(description = "Total de elementos")
-    private long totalElements;
-
-    @Schema(description = "Total de páginas")
-    private int totalPages;
-
-    @Schema(description = "Se é a primeira página")
-    private boolean first;
-
-    @Schema(description = "Se é a última página")
-    private boolean last;
-
-    @Schema(description = "Se está vazio")
-    private boolean empty;
-
-    public static <T> PageResponseDTO<T> from(Page<T> page) {
-        PageResponseDTO<T> response = new PageResponseDTO<>();
-        response.content = page.getContent();
-        response.pageNumber = page.getNumber();
-        response.pageSize = page.getSize();
-        response.totalElements = page.getTotalElements();
-        response.totalPages = page.getTotalPages();
-        response.first = page.isFirst();
-        response.last = page.isLast();
-        response.empty = page.isEmpty();
-        return response;
-    }
-
-    // Getters e Setters...
+    private Long totalProdutos;
+    private Long produtosAtivos;
+    private Long produtosInativos;
+    private Long produtosEmDestaque;
+    private BigDecimal precoMedio;
+    private BigDecimal precoMinimo;
+    private BigDecimal precoMaximo;
+    private Long estoqueTotal;
+    private Map<String, Long> produtosPorCategoria;
+    private Map<String, Long> produtosPorMarca;
 }
 ```
 
 ---
 
-## Validações Bean Validation
+## Paginação
+
+Não há DTO de página próprio. Os endpoints `GET /api/v1/produtos/findAll?page=&size=[&sort=]` retornam
+`org.springframework.data.domain.Page<ProdutoDTO>` diretamente (`ProdutoService.buscarTodos(page, size[, sort])`).
+
+---
+
+## Uso no Controller
 
 ```java
-package br.com.empresa.projeto.core.application.dto;
+@PostMapping
+public ResponseEntity<ProdutoDTO> criar(@Valid @RequestBody ProdutoCreateDTO dto) { ... }
 
-import jakarta.validation.constraints.*;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-
-public class CreatePedidoDTO {
-
-    @NotNull(message = "Cliente ID é obrigatório")
-    private String clienteId;
-
-    @NotEmpty(message = "Itens é obrigatório")
-    @Size(min = 1, message = "Pedido deve ter pelo menos 1 item")
-    private List<ItemPedidoDTO> itens;
-
-    @Pattern(regexp = "^[A-Z]{3}\\d{11}$", message = "CNPJ inválido")
-    private String cnpj;
-
-    @Email(message = "E-mail inválido")
-    @NotBlank(message = "E-mail é obrigatório")
-    private String email;
-
-    @Min(value = 1, message = "Valor mínimo é 1")
-    @Max(value = 10000, message = "Valor máximo é 10000")
-    private Integer quantidade;
-
-    @Positive(message = "Valor deve ser positivo")
-    private BigDecimal valor;
-
-    @Future(message = "Data deve ser futura")
-    private LocalDate dataEntrega;
-
-    @PastOrPresent(message = "Data não pode ser futura")
-    private LocalDateTime dataCriacao;
-
-    @AssertTrue(message = "Termos devem ser aceitos")
-    private Boolean termosAceitos;
-
-    // Getters e Setters...
-}
+@PutMapping("/{id}")
+public ResponseEntity<ProdutoDTO> atualizar(@PathVariable String id,
+                                            @Valid @RequestBody ProdutoUpdateDTO dto) { ... }
 ```
 
----
-
-## Validação Customizada
-
-```java
-// Annotation customizada
-@Target({ElementType.FIELD})
-@Retention(RetentionPolicy.RUNTIME)
-@Constraint(validatedBy = CnpjValidator.class)
-public @interface Cnpj {
-    String message() default "CNPJ inválido";
-    Class<?>[] groups() default {};
-    Class<? extends Payload>[] payload() default {};
-}
-
-// Validator
-public class CnpjValidator implements ConstraintValidator<Cnpj, String> {
-
-    @Override
-    public boolean isValid(String value, ConstraintValidatorContext context) {
-        if (value == null || value.isBlank()) {
-            return true; // Use @NotNull para required
-        }
-        return validarCNPJ(value);
-    }
-
-    private boolean validarCNPJ(String cnpj) {
-        // Lógica de validação de CNPJ
-        cnpj = cnpj.replaceAll("[^0-9]", "");
-        if (cnpj.length() != 14) return false;
-        // ... validação completa
-        return true;
-    }
-}
-
-// Uso
-public class CreateFornecedorDTO {
-    @Cnpj(message = "CNPJ inválido")
-    private String cnpj;
-}
-```
+O controller tem `@Validated` na classe e `@Valid` nos `@RequestBody`. O `ProdutoService` converte
+`ProdutoEntity` em DTO via `entity.toDTO()` (e `ProdutoEntity.fromDTO(dto)` para o caminho `ProdutoDTO`, mantido
+por compatibilidade). Existe ainda `ProdutoPersistenceMapper` (MapStruct) com `toDTO`/`toDomain`/`entityToDTO`,
+usado pelo adapter.
 
 ---
 
-## Lista de Validações Comuns
+## Anotações Bean Validation comuns
 
-| Annotation | Descrição | Exemplo |
-|------------|-----------|---------|
-| `@NotNull` | Campo obrigatório | `@NotNull private String nome;` |
-| `@NotBlank` | String não vazia | `@NotBlank private String descricao;` |
-| `@NotEmpty` | Coleção não vazia | `@NotEmpty private List<String> itens;` |
-| `@Size` | Tamanho mínimo/máximo | `@Size(min=3, max=100)` |
-| `@Min` / `@Max` | Valor numérico | `@Min(1) private Integer qtd;` |
-| `@Positive` | Número positivo | `@Positive private BigDecimal valor;` |
-| `@Email` | E-mail válido | `@Email private String email;` |
-| `@Pattern` | Expressão regular | `@Pattern(regexp="^[A-Z]{2}\\d{9}$")` |
-| `@Past` / `@Future` | Data passada/futura | `@Future private LocalDate data;` |
-| `@AssertTrue` | Deve ser true | `@AssertTrue private Boolean aceito;` |
+| Annotation | Descrição | Usada em Produto |
+|------------|-----------|------------------|
+| `@NotNull` | Campo obrigatório | `preco`, `categoria` (Create) |
+| `@NotBlank` | String não vazia | `nome` (Create) |
+| `@Size` | Tamanho mínimo/máximo | `nome`, `descricao`, `sku`, `marca`, `urlImagem` |
+| `@Positive` | Número maior que zero | `preco` |
+| `@PositiveOrZero` | Zero ou positivo | `estoque` |
+| `@Digits` | Dígitos inteiros/decimais | `preco` |
+| `@NotEmpty`, `@Min`/`@Max`, `@Email`, `@Pattern`, `@Past`/`@Future`, `@AssertTrue` | Disponíveis em `jakarta.validation.constraints` | não usadas hoje |
 
----
-
-## Response Padrão
-
-```java
-package br.com.empresa.projeto.core.application.dto;
-
-@Schema(description = "Response padrão da API")
-public class ResponseDTO<T> {
-
-    @Schema(description = "Dados de resposta")
-    private T data;
-
-    @Schema(description = "Mensagem")
-    private String message;
-
-    public static <T> ResponseDTO<T> ok(T data) {
-        ResponseDTO<T> response = new ResponseDTO<>();
-        response.data = data;
-        return response;
-    }
-
-    public static <T> ResponseDTO<T> ok(T data, String message) {
-        ResponseDTO<T> response = new ResponseDTO<>();
-        response.data = data;
-        response.message = message;
-        return response;
-    }
-
-    // Getters e Setters...
-}
-```
+Para validação customizada, crie a annotation com `@Constraint(validatedBy = ...)` e o
+`ConstraintValidator` (padrão Jakarta Validation; não há exemplo no repositório).
 
 ---
 
-**IMPORTANTE**: Sempre use `@Valid` no controller para validar DTOs automaticamente.
+**IMPORTANTE**: Sempre use `@Valid` no `@RequestBody` do controller para validar DTOs automaticamente.

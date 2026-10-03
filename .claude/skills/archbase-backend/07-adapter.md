@@ -6,332 +6,167 @@ Adapters implementam os Ports de saída, usando QueryDSL para queries.
 
 ## Conceito
 
-**CRÍTICO**: Adapter deve:
-- Implementar um Port de saída
-- Usar QueryDSL para queries (JPAQueryFactory)
-- Converter Entity ↔ Domain via Mapper
-- Estar anotado com `@Component`
+Adapter deve:
+- Implementar um Port de saída (`ProdutoPersistencePort`)
+- Usar `com.querydsl.jpa.impl.JPAQueryFactory` (bean fornecido por `QueryDslConfig`, módulo rest)
+- Converter Entity <-> Domain via Mapper (`ProdutoPersistenceMapper`)
+- Estar anotado com `@Component`, `@RequiredArgsConstructor`, `@Slf4j`
+
+O `JPAQueryFactory` **não** é do archbase: vem de `io.github.openfeign.querydsl` (pacote `com.querydsl`).
 
 ---
 
-## Adapter Básico
+## Adapter Real: ProdutoPersistenceAdapter
 
 ```java
-package br.com.empresa.projeto.core.infrastructure.output.persistence.adapter;
+package br.com.archbase.boilerplate.core.infrastructure.output.persistence.adapter;
 
-import br.com.archbase.ddd.infraestructure.persistence.jpa.querydsl.JpaQueryFactory;
-import br.com.empresa.projeto.core.application.port.out.ExamplePersistencePort;
-import br.com.empresa.projeto.core.domain.entity.Example;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.entity.QExampleEntity;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.entity.ExampleEntity;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.mapper.ExampleMapper;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.repository.ExampleJpaRepository;
+import br.com.archbase.boilerplate.core.application.dto.ProdutoEstatisticasDTO;
+import br.com.archbase.boilerplate.core.application.port.out.ProdutoPersistencePort;
+import br.com.archbase.boilerplate.core.domain.entity.Produto;
+import br.com.archbase.boilerplate.core.domain.enums.CategoriaProduto;
+import br.com.archbase.boilerplate.core.infrastructure.output.persistence.entity.ProdutoEntity;
+import br.com.archbase.boilerplate.core.infrastructure.output.persistence.entity.QProdutoEntity;
+import br.com.archbase.boilerplate.core.infrastructure.output.persistence.mapper.ProdutoPersistenceMapper;
+import br.com.archbase.boilerplate.core.infrastructure.output.persistence.repository.ProdutoJpaRepository;
+import br.com.archbase.query.rsql.jpa.SortUtils;
+import com.querydsl.core.Tuple;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
-
-@Slf4j
 @Component
 @RequiredArgsConstructor
-public class ExamplePersistenceAdapter implements ExamplePersistencePort {
+@Slf4j
+public class ProdutoPersistenceAdapter implements ProdutoPersistencePort {
 
-    private final ExampleJpaRepository repository;
+    private static final QProdutoEntity qProduto = QProdutoEntity.produtoEntity;
+
+    private final ProdutoJpaRepository repository;
     private final JPAQueryFactory queryFactory;
-    private final ExampleMapper mapper;
+    private final ProdutoPersistenceMapper mapper;
 
     @Override
-    public Example save(Example example) {
-        log.debug("Salvando example: {}", example.getId());
-        ExampleEntity entity = mapper.toEntity(example);
-        ExampleEntity saved = repository.save(entity);
+    public Produto save(Produto produto) {
+        ProdutoEntity saved = repository.save(mapper.toEntity(produto));
         return mapper.toDomain(saved);
     }
 
     @Override
-    public Optional<Example> findById(String id) {
-        return repository.findById(id)
-                .map(mapper::toDomain);
+    @Transactional(readOnly = true)
+    public Optional<Produto> findBySku(String sku) {
+        return repository.findBySku(sku).map(mapper::toDomain);
     }
 
     @Override
-    public List<Example> findAll() {
-        return repository.findAll().stream()
+    @Transactional(readOnly = true)
+    public List<Produto> findByCategoria(String categoria) {
+        return repository.findByCategoria(CategoriaProduto.valueOf(categoria)).stream()
                 .map(mapper::toDomain)
                 .collect(Collectors.toList());
     }
-
-    @Override
-    public List<Example> findByTenantId(String tenantId) {
-        QExampleEntity entity = QExampleEntity.exampleEntity;
-        return queryFactory
-                .selectFrom(entity)
-                .where(entity.tenantId.eq(tenantId))
-                .fetch()
-                .stream()
-                .map(mapper::toDomain)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public void deleteById(String id) {
-        log.debug("Deletando example: {}", id);
-        repository.deleteById(id);
-    }
-
-    @Override
-    public boolean existsById(String id) {
-        return repository.existsById(id);
-    }
+    // ...
 }
 ```
+
+Métodos simples delegam ao `ProdutoJpaRepository` (CRUD, `findBySku`, `existsBySku`,
+`findByAtivoTrue`). Métodos de leitura levam `@Transactional(readOnly = true)`.
 
 ---
 
-## Adapter com QueryDSL Complexo
+## Queries QueryDSL no Adapter
 
 ```java
-package br.com.empresa.projeto.core.infrastructure.output.persistence.adapter;
+@Override
+@Transactional(readOnly = true)
+public List<Produto> findByPrecoEntre(BigDecimal min, BigDecimal max) {
+    List<ProdutoEntity> entities = queryFactory
+            .selectFrom(qProduto)
+            .where(qProduto.preco.between(min, max))
+            .fetch();
+    return entities.stream().map(mapper::toDomain).collect(Collectors.toList());
+}
 
-import br.com.empresa.projeto.core.application.port.out.ProdutoPersistencePort;
-import br.com.empresa.projeto.core.application.dto.ProdutoFilterDTO;
-import br.com.empresa.projeto.core.domain.entity.Produto;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.entity.*;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.repository.ProdutoJpaRepository;
-import com.querydsl.core.BooleanBuilder;
-import com.querydsl.jpa.impl.JPAQueryFactory;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Component;
-
-import java.util.List;
-import java.util.Optional;
-
-@Slf4j
-@Component
-@RequiredArgsConstructor
-public class ProdutoPersistenceAdapter implements ProdutoPersistencePort {
-
-    private final ProdutoJpaRepository repository;
-    private final JPAQueryFactory queryFactory;
-    private final ProdutoMapper mapper;
-
-    @Override
-    public Page<Produto> findByFilter(ProdutoFilterDTO filter, Pageable pageable) {
-        QProdutoEntity produto = QProdutoEntity.produtoEntity;
-        QProdutoEntity p = produto; // alias
-
-        BooleanBuilder builder = new BooleanBuilder();
-
-        // Filtro por tenant (sempre aplicado)
-        if (filter.getTenantId() != null) {
-            builder.and(p.tenantId.eq(filter.getTenantId()));
-        }
-
-        // Filtro por nome (busca parcial)
-        filter.getNome().ifPresent(nome ->
-            builder.and(p.nome.containsIgnoreCase(nome))
-        );
-
-        // Filtro por SKU
-        filter.getSku().ifPresent(sku ->
-            builder.and(p.sku.containsIgnoreCase(sku))
-        );
-
-        // Filtro por categoria
-        filter.getCategoria().ifPresent(categoria ->
-            builder.and(p.categoria.eq(categoria))
-        );
-
-        // Filtro por ativo
-        filter.getAtivo().ifPresent(ativo ->
-            builder.and(p.ativo.eq(ativo))
-        );
-
-        // Filtro por faixa de preço
-        filter.getPrecoMin().ifPresent(min ->
-            builder.and(p.preco.goe(min))
-        );
-        filter.getPrecoMax().ifPresent(max ->
-            builder.and(p.preco.loe(max))
-        );
-
-        // Filtro por data de criação
-        filter.getDataCriacaoInicio().ifPresent(inicio ->
-            builder.and(p.createEntityDate.goe(inicio))
-        );
-        filter.getDataCriacaoFim().ifPresent(fim ->
-            builder.and(p.createEntityDate.loe(fim))
-        );
-
-        // Executa query
-        var query = queryFactory
-                .selectFrom(p)
-                .where(builder)
-                .orderBy(p.nome.asc())
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize());
-
-        List<Produto> content = query.fetch()
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
-
-        // Conta total para paginação
-        long total = queryFactory
-                .select(p.count())
-                .from(p)
-                .where(builder)
-                .fetchOne();
-
-        return new PageImpl<>(content, pageable, total);
-    }
-
-    @Override
-    public Optional<Produto> findBySku(String sku, String tenantId) {
-        QProdutoEntity produto = QProdutoEntity.produtoEntity;
-        return Optional.ofNullable(
-                queryFactory
-                        .selectFrom(produto)
-                        .where(produto.sku.eq(sku)
-                                .and(produto.tenantId.eq(tenantId)))
-                        .fetchOne()
-            ).map(mapper::toDomain);
-    }
+@Override
+@Transactional(readOnly = true)
+public List<Produto> findByMarca(String marca) {
+    return queryFactory.selectFrom(qProduto)
+            .where(qProduto.marca.equalsIgnoreCase(marca))
+            .fetch().stream().map(mapper::toDomain).collect(Collectors.toList());
 }
 ```
+
+Sem `qProduto.tenantId.eq(...)`: o filtro de tenant é aplicado pelo Hibernate (`@TenantId`).
 
 ---
 
-## Adapter com Join
+## Agregação com Tuple (obterEstatisticas)
 
 ```java
-package br.com.empresa.projeto.core.infrastructure.output.persistence.adapter;
+Long totalProdutos = queryFactory
+        .select(qProduto.count())
+        .from(qProduto)
+        .fetchOne();
 
-import br.com.empresa.projeto.core.application.port.out.PedidoPersistencePort;
-import br.com.empresa.projeto.core.domain.entity.Pedido;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.entity.*;
-import br.com.empresa.projeto.core.infrastructure.output.persistence.repository.PedidoJpaRepository;
-import com.querydsl.jpa.impl.JPAQueryFactory;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+Long estoqueTotal = queryFactory
+        .select(qProduto.estoque.sumAggregate().longValue())
+        .from(qProduto)
+        .fetchOne();
 
-import java.util.List;
-import java.util.Optional;
-
-@Component
-@RequiredArgsConstructor
-public class PedidoPersistenceAdapter implements PedidoPersistencePort {
-
-    private final PedidoJpaRepository repository;
-    private final JPAQueryFactory queryFactory;
-    private final PedidoMapper mapper;
-
-    @Override
-    public List<Pedido> findByClienteId(String clienteId, String tenantId) {
-        QPedidoEntity pedido = QPedidoEntity.pedidoEntity;
-        QClienteEntity cliente = QClienteEntity.clienteEntity;
-
-        return queryFactory
-                .selectFrom(pedido)
-                .innerJoin(pedido.cliente, cliente)
-                .where(cliente.id.eq(clienteId)
-                        .and(pedido.tenantId.eq(tenantId)))
-                .fetch()
-                .stream()
-                .map(mapper::toDomain)
-                .toList();
-    }
-
-    @Override
-    public Optional<Pedido> findByIdWithItens(String id) {
-        QPedidoEntity pedido = QPedidoEntity.pedidoEntity;
-        QPedidoItemEntity item = QPedidoItemEntity.pedidoItemEntity;
-
-        PedidoEntity entity = queryFactory
-                .selectFrom(pedido)
-                .leftJoin(pedido.itens, item).fetchJoin()
-                .where(pedido.id.eq(id))
-                .fetchOne();
-
-        return Optional.ofNullable(entity)
-                .map(mapper::toDomain);
+Map<String, Long> produtosPorCategoria = new HashMap<>();
+List<Tuple> categoriaResults = queryFactory
+        .select(qProduto.categoria, qProduto.count())
+        .from(qProduto)
+        .groupBy(qProduto.categoria)
+        .fetch();
+for (Tuple tuple : categoriaResults) {
+    CategoriaProduto cat = tuple.get(qProduto.categoria);
+    Long count = tuple.get(qProduto.count());
+    if (cat != null && count != null) {
+        produtosPorCategoria.put(cat.name(), count);
     }
 }
 ```
 
----
-
-## Adapter com Agregação
-
-```java
-@Override
-public BigDecimal sumTotalByTenantId(String tenantId) {
-    QPedidoEntity pedido = QPedidoEntity.pedidoEntity;
-    return queryFactory
-            .select(pedido.valorTotal.sum())
-            .from(pedido)
-            .where(pedido.tenantId.eq(tenantId))
-            .fetchOne();
-}
-
-@Override
-public List<ResumoVendasDTO> getResumoPorCategoria(String tenantId) {
-    QPedidoEntity pedido = QPedidoEntity.pedidoEntity;
-
-    return queryFactory
-            .select(
-                    pedido.categoria,
-                    pedido.valorTotal.sum(),
-                    pedido.count()
-            )
-            .from(pedido)
-            .where(pedido.tenantId.eq(tenantId))
-            .groupBy(pedido.categoria)
-            .fetch()
-            .stream()
-            .map(tuple -> new ResumoVendasDTO(
-                    tuple.get(pedido.categoria),
-                    tuple.get(pedido.valorTotal.sum()),
-                    tuple.get(pedido.count())
-            ))
-            .toList();
-}
-```
+O resultado é montado em `ProdutoEstatisticasDTO` (nulos de contagem viram `0L`). Note que
+`avg()` devolve `Double` e é convertido com `BigDecimal.valueOf`.
 
 ---
 
-## Adapter com Batch Operations
+## Métodos do FindDataWithFilterQuery (RSQL + paginação)
 
 ```java
 @Override
-public List<Example> saveAll(List<Example> examples) {
-    List<ExampleEntity> entities = examples.stream()
-            .map(mapper::toEntity)
-            .toList();
-    List<ExampleEntity> saved = repository.saveAll(entities);
-    return saved.stream()
-            .map(mapper::toDomain)
-            .toList();
+@Transactional(readOnly = true)
+public Page<Produto> findAll(int page, int size, String[] sort) {
+    Pageable pageable = PageRequest.of(page, size, Sort.by(SortUtils.convertSortToJpa(sort)));
+    Page<ProdutoEntity> result = repository.findAll(pageable);
+    List<Produto> list = result.stream().map(mapper::toDomain).collect(Collectors.toList());
+    return new PageProduto(list, pageable, result.getTotalElements());
 }
 
 @Override
-@Transactional
-public void deleteAllByIds(List<String> ids) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-    queryFactory
-            .delete(entity)
-            .where(entity.id.in(ids))
-            .execute();
+@Transactional(readOnly = true)
+public Page<Produto> findWithFilter(String filter, int page, int size) {
+    Pageable pageable = PageRequest.of(page, size);
+    Page<ProdutoEntity> result = repository.findAll(filter, pageable);   // filtro RSQL
+    // ... mapper::toDomain ...
+    return new PageProduto(list, pageable, result.getTotalElements());
+}
+
+@Override
+@Transactional(readOnly = true)
+public Produto findById(String id) {
+    return repository.findById(id).map(mapper::toDomain).orElse(null);   // null se não achar
 }
 ```
+
+- `SortUtils` é `br.com.archbase.query.rsql.jpa.SortUtils` (`convertSortToJpa(String[])`).
+- `PageProduto` é uma classe interna que estende `PageImpl<Produto>`.
+- `findById` devolve `null` (contrato do `FindDataWithFilterQuery`), não `Optional`.
 
 ---
 
@@ -339,17 +174,14 @@ public void deleteAllByIds(List<String> ids) {
 
 | Operação | QueryDSL | Descrição |
 |----------|----------|-----------|
-| `eq` | `entity.campo.eq(valor)` | Igual a |
-| `ne` | `entity.campo.ne(valor)` | Diferente de |
-| `contains` / `startsWith` / `endsWith` | String parcial | Busca texto |
-| `gt` / `goe` | `entity.numero.goe(valor)` | Maior que / Maior ou igual |
-| `lt` / `loe` | `entity.numero.loe(valor)` | Menor que / Menor ou igual |
-| `between` | `entity.data.between(inicio, fim)` | Entre valores |
-| `in` | `entity.status.in(lista)` | Em lista |
-| `isNull` / `isNotNull` | `entity.campo.isNull()` | É nulo |
-| `like` | `entity.nome.like("%texto%")` | Like SQL |
-| `orderBy` | `.orderBy(entity.nome.asc())` | Ordenação |
-| `leftJoin` / `innerJoin` | `.join(entity.relacao)` | Join |
+| `eq` | `qProduto.sku.eq(valor)` | Igual a |
+| `between` | `qProduto.preco.between(min, max)` | Entre valores |
+| `isTrue` / `isFalse` | `qProduto.ativo.isTrue()` | Booleano |
+| `equalsIgnoreCase` | `qProduto.marca.equalsIgnoreCase(m)` | Texto, ignora caixa |
+| `isNotNull` | `qProduto.marca.isNotNull()` | Não nulo |
+| `count` / `min` / `max` / `avg` | `qProduto.preco.max()` | Agregações |
+| `groupBy` | `.groupBy(qProduto.categoria)` | Agrupamento |
+| `gt` / `goe` / `lt` / `loe` / `in` / `contains` | padrão QueryDSL | Demais operadores |
 
 ---
 
@@ -359,11 +191,11 @@ public void deleteAllByIds(List<String> ids) {
 |---------|-----------|
 | **@Component** | Sempre anotar com @Component |
 | **@RequiredArgsConstructor** | Injeção via construtor |
-| **BooleanBuilder** | Para filtros dinâmicos/opcionais |
-| **Stream().map()** | Converter Entity → Domain via mapper |
-| **@Transactional** | Em operações de escrita |
-| **Log debug** | Logar operações importantes |
+| **Q-class estática** | `private static final QProdutoEntity qProduto = QProdutoEntity.produtoEntity;` |
+| **@Transactional(readOnly = true)** | Em leituras; escritas via repository já são transacionais |
+| **Mapper** | Entity -> Domain com `mapper::toDomain` |
+| **RSQL** | Delegar ao `repository.findAll(filter, pageable)` |
 
 ---
 
-**CRÍTICO**: NUNCA faça queries no Repository. Use QueryDSL no Adapter.
+**IMPORTANTE**: Hoje o adapter não é injetado por nenhum Service (ver 06-port.md); o `ProdutoService` usa o repository direto.

@@ -1,371 +1,148 @@
 # 11. QueryDSL
 
-Queries tipo-safe usando JPAQueryFactory no Adapter.
+Queries type-safe usando `JPAQueryFactory` no Adapter.
 
 ---
 
 ## Conceito
 
-**CRÍTICO**: QueryDSL deve:
-- Ser usado no Persistence Adapter
-- Usar JPAQueryFactory injetado
-- Usar classes Q geradas automaticamente
-- Retornar Domain Objects (mapper.toDomain)
+- QueryDSL do projeto: `io.github.openfeign.querydsl` 7.2 (`querydsl-jpa` + `querydsl-apt` classifier `jakarta`), pacotes `com.querydsl.*`
+- Usado no Persistence Adapter (`ProdutoPersistenceAdapter`) com `JPAQueryFactory`
+- Classes Q (ex.: `QProdutoEntity`) geradas pelo annotation processor no build do módulo core
+- Retorna Domain Objects (`mapper::toDomain`) ou DTOs de agregação
 
 ---
 
-## Configuração JPAQueryFactory
+## Configuração JPAQueryFactory (real)
+
+Em `archbase-boilerplate-rest`, `infrastructure/config/QueryDslConfig.java`:
 
 ```java
+import com.querydsl.jpa.impl.JPAQueryFactory;
+
 @Configuration
-public class QueryDSLConfig {
+public class QueryDslConfig {
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Bean
-    public JPAQueryFactory jpaQueryFactory(EntityManager entityManager) {
+    public JPAQueryFactory jpaQueryFactory() {
         return new JPAQueryFactory(entityManager);
     }
 }
 ```
 
+Sem esse bean a aplicação não sobe (`NoSuchBeanDefinitionException ... JPAQueryFactory`), porque o
+adapter o injeta.
+
 No Adapter:
 ```java
-@Component
-@RequiredArgsConstructor
-public class ExamplePersistenceAdapter {
-
-    private final JPAQueryFactory queryFactory;  // Injetado automaticamente
-
-    // ...
-}
+private static final QProdutoEntity qProduto = QProdutoEntity.produtoEntity;
+private final JPAQueryFactory queryFactory;
 ```
 
 ---
 
-## Query Básica
+## Tenant
 
-```java
-QExampleEntity entity = QExampleEntity.exampleEntity;
-
-List<Example> result = queryFactory
-        .selectFrom(entity)
-        .where(entity.tenantId.eq(tenantId))
-        .fetch()
-        .stream()
-        .map(mapper::toDomain)
-        .toList();
-```
+Não filtre por `tenantId` nas queries. A entidade base (`TenantPersistenceEntityBase`) marca o
+campo com `@TenantId` do Hibernate, que aplica o filtro do tenant corrente nas consultas.
 
 ---
 
-## Query com Filtros Opcionais (BooleanBuilder)
+## Query Básica (real: findByPrecoEntre)
 
 ```java
-public List<Example> buscarComFiltros(String nome, Boolean ativo, String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-    BooleanBuilder builder = new BooleanBuilder();
+List<ProdutoEntity> entities = queryFactory
+        .selectFrom(qProduto)
+        .where(qProduto.preco.between(min, max))
+        .fetch();
+return entities.stream().map(mapper::toDomain).collect(Collectors.toList());
+```
 
-    // Filtro obrigatório
-    builder.and(entity.tenantId.eq(tenantId));
+Outros exemplos reais: `qProduto.destaque.isTrue()` (findEmDestaque) e
+`qProduto.marca.equalsIgnoreCase(marca)` (findByMarca).
 
-    // Filtros opcionais
-    if (nome != null && !nome.isBlank()) {
-        builder.and(entity.nome.containsIgnoreCase(nome));
+---
+
+## Agregações (real: obterEstatisticas)
+
+```java
+Long total = queryFactory.select(qProduto.count()).from(qProduto).fetchOne();
+
+Long ativos = queryFactory.select(qProduto.count()).from(qProduto)
+        .where(qProduto.ativo.isTrue())
+        .fetchOne();
+
+Double precoMedio = queryFactory.select(qProduto.preco.avg()).from(qProduto).fetchOne();
+BigDecimal precoMinimo = queryFactory.select(qProduto.preco.min()).from(qProduto).fetchOne();
+BigDecimal precoMaximo = queryFactory.select(qProduto.preco.max()).from(qProduto).fetchOne();
+
+Long estoqueTotal = queryFactory
+        .select(qProduto.estoque.sumAggregate().longValue())
+        .from(qProduto)
+        .fetchOne();
+```
+
+`avg()` retorna `Double` (converta com `BigDecimal.valueOf`); `fetchOne()` pode retornar `null`, então trate com `!= null ? x : 0L`.
+
+---
+
+## GroupBy com Tuple (real)
+
+```java
+import com.querydsl.core.Tuple;
+
+List<Tuple> marcaResults = queryFactory
+        .select(qProduto.marca, qProduto.count())
+        .from(qProduto)
+        .where(qProduto.marca.isNotNull())
+        .groupBy(qProduto.marca)
+        .fetch();
+
+for (Tuple tuple : marcaResults) {
+    String marca = tuple.get(qProduto.marca);
+    Long count = tuple.get(qProduto.count());
+    if (marca != null && count != null) {
+        produtosPorMarca.put(marca, count);
     }
-
-    if (ativo != null) {
-        builder.and(entity.ativo.eq(ativo));
-    }
-
-    return queryFactory
-            .selectFrom(entity)
-            .where(builder)
-            .orderBy(entity.nome.asc())
-            .fetch()
-            .stream()
-            .map(mapper::toDomain)
-            .toList();
 }
 ```
 
 ---
 
-## Query com Between e Data
+## Filtros Opcionais (BooleanBuilder) - padrão, ainda não usado no adapter
+
+Padrão QueryDSL para filtros dinâmicos, aplicado a campos reais de `ProdutoEntity`:
 
 ```java
-public List<Example> buscarPorDataRange(
-        LocalDateTime dataInicio,
-        LocalDateTime dataFim,
-        String tenantId) {
+BooleanBuilder builder = new BooleanBuilder();
+if (nome != null && !nome.isBlank()) builder.and(qProduto.nome.containsIgnoreCase(nome));
+if (categoria != null) builder.and(qProduto.categoria.eq(categoria));
+if (ativo != null) builder.and(qProduto.ativo.eq(ativo));
 
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-
-    return queryFactory
-            .selectFrom(entity)
-            .where(
-                entity.tenantId.eq(tenantId)
-                .and(entity.createEntityDate.between(dataInicio, dataFim))
-            )
-            .orderBy(entity.createEntityDate.desc())
-            .fetch()
-            .stream()
-            .map(mapper::toDomain)
-            .toList();
-}
+List<ProdutoEntity> result = queryFactory.selectFrom(qProduto)
+        .where(builder)
+        .orderBy(qProduto.nome.asc())
+        .fetch();
 ```
+
+Para filtros vindos do frontend, o caminho usado hoje é RSQL: `findWithFilter(filter, page, size)`
+do `FindDataWithFilterQuery`, que delega a `repository.findAll(filter, pageable)`.
 
 ---
 
-## Query com IN (Lista)
+## Paginação e Ordenação (real: via repository + SortUtils)
+
+O adapter não pagina com `offset/limit`; usa Spring Data + `SortUtils`:
 
 ```java
-public List<Example> buscarPorCategorias(List<Categoria> categorias, String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-
-    return queryFactory
-            .selectFrom(entity)
-            .where(
-                entity.tenantId.eq(tenantId)
-                .and(entity.categoria.in(categorias))
-            )
-            .fetch()
-            .stream()
-            .map(mapper::toDomain)
-            .toList();
-}
+Pageable pageable = PageRequest.of(page, size, Sort.by(SortUtils.convertSortToJpa(sort)));
+Page<ProdutoEntity> result = repository.findAll(filter, pageable);
 ```
 
----
-
-## Query com Joins
-
-```java
-// Inner Join
-public List<Pedido> buscarPedidosComCliente(String clienteId) {
-    QPedidoEntity pedido = QPedidoEntity.pedidoEntity;
-    QClienteEntity cliente = QClienteEntity.clienteEntity;
-
-    return queryFactory
-            .selectFrom(pedido)
-            .innerJoin(pedido.cliente, cliente)
-            .where(cliente.id.eq(clienteId))
-            .fetch()
-            .stream()
-            .map(mapper::toDomain)
-            .toList();
-}
-
-// Left Join
-public List<Pedido> buscarPedidosComItens(String tenantId) {
-    QPedidoEntity pedido = QPedidoEntity.pedidoEntity;
-    QPedidoItemEntity item = QPedidoItemEntity.pedidoItemEntity;
-
-    return queryFactory
-            .selectFrom(pedido)
-            .leftJoin(pedido.itens, item).fetchJoin()
-            .where(pedido.tenantId.eq(tenantId))
-            .distinct()
-            .fetch()
-            .stream()
-            .map(mapper::toDomain)
-            .toList();
-}
-```
-
----
-
-## Query com FetchJoin (Performance)
-
-```java
-public List<Produto> buscarProdutosComCategoria(String tenantId) {
-    QProdutoEntity produto = QProdutoEntity.produtoEntity;
-
-    return queryFactory
-            .selectFrom(produto)
-            .innerJoin(produto.categoria).fetchJoin()  // Evita N+1
-            .where(produto.tenantId.eq(tenantId))
-            .fetch()
-            .stream()
-            .map(mapper::toDomain)
-            .toList();
-}
-```
-
----
-
-## Query Paginada
-
-```java
-public Page<Example> buscarPaginado(int page, int size, String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-
-    List<Example> content = queryFactory
-            .selectFrom(entity)
-            .where(entity.tenantId.eq(tenantId))
-            .orderBy(entity.nome.asc())
-            .offset(page * size)
-            .limit(size)
-            .fetch()
-            .stream()
-            .map(mapper::toDomain)
-            .toList();
-
-    // Contar total
-    long total = queryFactory
-            .select(entity.count())
-            .from(entity)
-            .where(entity.tenantId.eq(tenantId))
-            .fetchOne();
-
-    return new PageImpl<>(content, PageRequest.of(page, size), total);
-}
-```
-
----
-
-## Query com Projeção
-
-```java
-public List<ResumoDTO> buscarResumo(String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-
-    return queryFactory
-            .select(
-                entity.id,
-                entity.nome,
-                entity.valor
-            )
-            .from(entity)
-            .where(entity.tenantId.eq(tenantId))
-            .fetch()
-            .stream()
-            .map(tuple -> new ResumoDTO(
-                tuple.get(entity.id),
-                tuple.get(entity.nome),
-                tuple.get(entity.valor)
-            ))
-            .toList();
-}
-```
-
----
-
-## Query com Agregação
-
-```java
-public BigDecimal somarValores(String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-
-    return queryFactory
-            .select(entity.valor.sum())
-            .from(entity)
-            .where(entity.tenantId.eq(tenantId))
-            .fetchOne();
-}
-
-public EstatisticasDTO buscarEstatisticas(String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-
-    Tuple result = queryFactory
-            .select(
-                entity.count(),
-                entity.valor.sum(),
-                entity.valor.avg(),
-                entity.valor.max(),
-                entity.valor.min()
-            )
-            .from(entity)
-            .where(entity.tenantId.eq(tenantId))
-            .fetchOne();
-
-    return new EstatisticasDTO(
-        result.get(entity.count()),
-        result.get(entity.valor.sum()),
-        result.get(entity.valor.avg()),
-        result.get(entity.valor.max()),
-        result.get(entity.valor.min())
-    );
-}
-```
-
----
-
-## Query com GroupBy
-
-```java
-public List<ContagemPorCategoria> contarPorCategoria(String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-
-    return queryFactory
-            .select(
-                entity.categoria,
-                entity.count()
-            )
-            .from(entity)
-            .where(entity.tenantId.eq(tenantId))
-            .groupBy(entity.categoria)
-            .fetch()
-            .stream()
-            .map(tuple -> new ContagemPorCategoria(
-                tuple.get(entity.categoria),
-                tuple.get(entity.count())
-            ))
-            .toList();
-}
-```
-
----
-
-## Query com Case (When/Then)
-
-```java
-public List<ExampleDTO> buscarComStatusCalculado(String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-
-    return queryFactory
-            .selectFrom(entity)
-            .where(entity.tenantId.eq(tenantId))
-            .fetch()
-            .stream()
-            .map(e -> {
-                ExampleDTO dto = mapper.toDTO(mapper.toDomain(e));
-                // Calcular status baseado em regras
-                if (e.getValor().compareTo(BigDecimal.valueOf(100)) > 0) {
-                    dto.setStatus("ALTO");
-                } else if (e.getValor().compareTo(BigDecimal.valueOf(50)) > 0) {
-                    dto.setStatus("MEDIO");
-                } else {
-                    dto.setStatus("BAIXO");
-                }
-                return dto;
-            })
-            .toList();
-}
-```
-
----
-
-## Query com Subquery
-
-```java
-public List<Example> buscarComSubquery(String tenantId) {
-    QExampleEntity entity = QExampleEntity.exampleEntity;
-    QPedidoEntity pedido = QPedidoEntity.pedidoEntity;
-
-    return queryFactory
-            .selectFrom(entity)
-            .where(entity.tenantId.eq(tenantId)
-                .and(entity.id.in(
-                    JPAExpressions.select(pedido.exampleId)
-                        .from(pedido)
-                        .where(pedido.status.eq(Pedido.Status.CONCLUIDO))
-                ))
-            )
-            .fetch()
-            .stream()
-            .map(mapper::toDomain)
-            .toList();
-}
-```
+`SortUtils` = `br.com.archbase.query.rsql.jpa.SortUtils`.
 
 ---
 
@@ -373,24 +150,18 @@ public List<Example> buscarComSubquery(String tenantId) {
 
 | Operação | Sintaxe | Descrição |
 |----------|---------|-----------|
-| `eq` | `entity.campo.eq(valor)` | Igual |
-| `ne` | `entity.campo.ne(valor)` | Diferente |
-| `contains` | `entity.texto.contains("x")` | Contém |
-| `startsWith` | `entity.texto.startsWith("x")` | Começa com |
-| `endsWith` | `entity.texto.endsWith("x")` | Termina com |
-| `gt` | `entity.numero.gt(10)` | Maior que |
-| `goe` | `entity.numero.goe(10)` | Maior ou igual |
-| `lt` | `entity.numero.lt(10)` | Menor que |
-| `loe` | `entity.numero.loe(10)` | Menor ou igual |
-| `between` | `entity.data.between(inicio, fim)` | Entre |
-| `in` | `entity.status.in(lista)` | Em lista |
-| `notIn` | `entity.status.notIn(lista)` | Não em lista |
-| `isNull` | `entity.campo.isNull()` | É nulo |
-| `isNotNull` | `entity.campo.isNotNull()` | Não é nulo |
-| `like` | `entity.texto.like("%x%")` | Like SQL |
-| `orderBy` | `.orderBy(entity.nome.asc())` | Ordenar |
-| `distinct` | `.distinct()` | Remover duplicatas |
+| `eq` / `ne` | `qProduto.sku.eq("x")` | Igual / diferente |
+| `between` | `qProduto.preco.between(min, max)` | Entre |
+| `isTrue` / `isFalse` | `qProduto.ativo.isTrue()` | Booleano |
+| `equalsIgnoreCase` | `qProduto.marca.equalsIgnoreCase(m)` | Texto sem caixa |
+| `containsIgnoreCase` | `qProduto.nome.containsIgnoreCase(n)` | Contém |
+| `gt` / `goe` / `lt` / `loe` | `qProduto.estoque.goe(10)` | Comparações |
+| `in` | `qProduto.categoria.in(lista)` | Em lista |
+| `isNull` / `isNotNull` | `qProduto.marca.isNotNull()` | Nulo |
+| `count` / `min` / `max` / `avg` | `qProduto.preco.max()` | Agregações |
+| `groupBy` | `.groupBy(qProduto.categoria)` | Agrupar |
+| `orderBy` | `.orderBy(qProduto.nome.asc())` | Ordenar |
 
 ---
 
-**CRÍTICO**: Queries complexas SEMPRE no Adapter com QueryDSL, JAMAS no Repository.
+**IMPORTANTE**: Queries com agregação/filtro específico ficam no Adapter com QueryDSL; consultas simples por campo único ficam como query methods no `ProdutoJpaRepository`.
