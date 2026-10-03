@@ -10,7 +10,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
@@ -66,7 +68,7 @@ class TenantAccessValidationFilterTest {
         verify(chain, never()).doFilter(request, response);
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(response.getContentAsString())
-                .contains("\"status\":\"FORBIDDEN\"", "\"path\":\"/api/v1/produtos\"",
+                .contains("\"status\":\"403 FORBIDDEN\"", "\"path\":\"/api/v1/produtos\"",
                         "Acesso negado ao tenant solicitado");
     }
 
@@ -84,6 +86,14 @@ class TenantAccessValidationFilterTest {
         filter.doFilter(request, response, chain);
         verify(chain, never()).doFilter(request, response);
         assertThat(response.getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void naoValidaRequisicaoAnonima() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new AnonymousAuthenticationToken(
+                "chave", "anonymousUser", List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+        filter.doFilter(request, response, chain);
+        verify(chain).doFilter(request, response);
     }
 
     @Test

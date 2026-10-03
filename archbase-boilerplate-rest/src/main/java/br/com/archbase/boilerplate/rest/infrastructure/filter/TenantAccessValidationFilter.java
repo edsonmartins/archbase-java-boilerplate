@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.core.annotation.Order;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -62,7 +63,10 @@ public class TenantAccessValidationFilter implements Filter {
             return false;
         }
 
-        if (authentication == null || !authentication.isAuthenticated()) {
+        // Anônimo não tem tenant para comparar (o principal é a String "anonymousUser"): quem decide
+        // se a rota exige login é a cadeia do Spring Security. Validar aqui negaria o próprio login.
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
             return false;
         }
 

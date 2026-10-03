@@ -272,8 +272,11 @@ mvn test
 # Executar (profile dev é o padrão)
 mvn spring-boot:run -pl archbase-boilerplate-rest
 
-# Executar em H2, sem infraestrutura
-mvn spring-boot:run -pl archbase-boilerplate-rest -Dspring-boot.run.profiles=h2
+# Executar em H2, sem infraestrutura. A migration V1 é específica de PostgreSQL, então no H2 é preciso
+# desligar o Flyway (o Hibernate cria o schema) e informar um ARCHBASE_JWT_SECRET em Base64 de >= 32 bytes
+# (ex.: openssl rand -base64 48). Login do seed em dev: admin@archbase.com.br / admin.
+SPRING_FLYWAY_ENABLED=false ARCHBASE_JWT_SECRET=$(openssl rand -base64 48) \
+  mvn spring-boot:run -pl archbase-boilerplate-rest -Dspring-boot.run.profiles=h2
 ```
 
 ---
