@@ -101,8 +101,10 @@ Exemplo de resposta de validação:
 ```
 
 Para tratar uma exceção nova, adicione um `@ExceptionHandler` no `RestExceptionHandler` e use o
-`buildResponseEntity(ApiError)`. Não crie um segundo `@ControllerAdvice`. Ressalva: o campo `path` do
-`ApiError` existe, mas o handler atual não o preenche.
+`buildResponseEntity(ApiError)`. Não crie um segundo `@ControllerAdvice`. O campo `path` do
+`ApiError` é preenchido pelo próprio `buildResponseEntity` com o `getRequestURI()` da requisição em curso
+(sem query string); por isso todo handler novo o recebe sem código extra. Coberto por
+`RestExceptionHandlerTest`.
 
 ---
 
