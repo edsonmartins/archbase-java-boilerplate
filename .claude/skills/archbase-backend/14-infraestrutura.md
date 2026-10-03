@@ -120,7 +120,7 @@ chama `ArchbaseTenantContext.setTenantId(...)` (`br.com.archbase.ddd.context`). 
 usa `archbase.app.tenant.default.id` (`@Value("${archbase.app.tenant.default.id:}")`). No `finally`
 faz `ArchbaseTenantContext.clear()`.
 
-**`TenantAccessValidationFilter`** (`@Order(2)`): para requisições autenticadas, fora de
+**`TenantAccessValidationFilter`** (`@Order(2)`): para requisições autenticadas (token anônimo **não** é validado aqui, senão o próprio login receberia 403), fora de
 `/actuator`, `/swagger-ui`, `/v3/api-docs` e `/api/v1/public`, compara o tenant do contexto com o
 `getTenantId()` do principal (via reflection). Responde **403** com um `ApiError` em JSON (via `ApiErrorWriter`) quando forem diferentes e também quando o tenant do
 usuário não puder ser determinado (principal ausente, sem `getTenantId`, tenant em branco ou erro na
@@ -218,7 +218,10 @@ security:
     ip:            { limit: 50,   duration: 60 }    # duration em segundos
 ```
 
-O 429 também sai como `ApiError`. Coberto por `RateLimitingFilterTest`.
+O 429 também sai como `ApiError`. O `status` é serializado como `"429 TOO_MANY_REQUESTS"`, igual aos handlers do MVC
+(o `ApiErrorWriter` usa um mapper com `WRITE_ENUMS_USING_TO_STRING` para isso). Só age em rotas que chegam ao filtro:
+rota protegida sem token já volta 401 do Spring Security antes dele, então na prática o limite anônimo protege as
+rotas públicas, como `/api/v1/auth/authenticate`. Coberto por `RateLimitingFilterTest`.
 
 ---
 

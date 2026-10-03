@@ -53,7 +53,7 @@ class RateLimitingFilterTest {
         assertThat(Long.parseLong(terceira.getHeader("Retry-After"))).isPositive();
         assertThat(terceira.getContentType()).startsWith("application/json");
         assertThat(terceira.getContentAsString())
-                .contains("\"status\":\"TOO_MANY_REQUESTS\"", "\"path\":\"/api/v1/produtos\"");
+                .contains("\"status\":\"429 TOO_MANY_REQUESTS\"", "\"path\":\"/api/v1/produtos\"");
         verify(chain, times(2)).doFilter(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
