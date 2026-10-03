@@ -1,82 +1,111 @@
 package br.com.archbase.boilerplate.rest.infrastructure.config;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Bucket4j;
 import io.github.bucket4j.Refill;
-import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Configuração de Rate Limiting com Bucket4j.
+ * Configuração de Rate Limiting com Bucket4j, aplicada pelo {@code RateLimitingFilter}.
  *
- * <p>Implementa controle de taxa de requisições para diferentes tipos de endpoints:
+ * <p>Três perfis de limite, cada um com seu próprio conjunto de buckets:
  * <ul>
- *   <li>Webhooks: 100 req/min (evita sobrecarga de webhooks externos)</li>
- *   <li>APIs autenticadas: 1000 req/min (uso normal do sistema)</li>
- *   <li>APIs por IP: 50 req/min (proteção contra abuso)</li>
+ *   <li>webhooks ({@code /api/v1/webhooks/**}, por IP): 100 req/min</li>
+ *   <li>usuários autenticados (por usuário): 1000 req/min</li>
+ *   <li>requisições anônimas (por IP): 50 req/min</li>
  * </ul>
- * </p>
+ * Os valores vêm de {@code security.rate-limit.*}; {@code security.rate-limit.enabled=false}
+ * desliga o filtro.
+ *
+ * <p>Os buckets ficam em caches Caffeine com expiração e teto de tamanho: um mapa simples cresceria
+ * sem limite, uma entrada por IP, e o próprio rate limit viraria vetor de esgotamento de memória.
+ * O estado é local à instância — com várias réplicas o limite efetivo é multiplicado por elas.
  */
 @Configuration
 public class RateLimitingConfig {
 
-    @Value("${security.rate-limit.webhook.limit:100}")
-    private int webhookLimit;
+    private static final long MAX_BUCKETS = 100_000;
 
-    @Value("${security.rate-limit.webhook.duration:60}")
-    private int webhookDurationSeconds;
+    private final boolean enabled;
+    private final int webhookLimit;
+    private final int webhookDurationSeconds;
+    private final int authenticatedLimit;
+    private final int authenticatedDurationSeconds;
+    private final int ipLimit;
+    private final int ipDurationSeconds;
 
-    @Value("${security.rate-limit.authenticated.limit:1000}")
-    private int authenticatedLimit;
+    private final Cache<String, Bucket> webhookBuckets;
+    private final Cache<String, Bucket> authenticatedBuckets;
+    private final Cache<String, Bucket> ipBuckets;
 
-    @Value("${security.rate-limit.authenticated.duration:60}")
-    private int authenticatedDurationSeconds;
+    public RateLimitingConfig(
+            @Value("${security.rate-limit.enabled:true}") boolean enabled,
+            @Value("${security.rate-limit.webhook.limit:100}") int webhookLimit,
+            @Value("${security.rate-limit.webhook.duration:60}") int webhookDurationSeconds,
+            @Value("${security.rate-limit.authenticated.limit:1000}") int authenticatedLimit,
+            @Value("${security.rate-limit.authenticated.duration:60}") int authenticatedDurationSeconds,
+            @Value("${security.rate-limit.ip.limit:50}") int ipLimit,
+            @Value("${security.rate-limit.ip.duration:60}") int ipDurationSeconds) {
+        this.enabled = enabled;
+        this.webhookLimit = webhookLimit;
+        this.webhookDurationSeconds = webhookDurationSeconds;
+        this.authenticatedLimit = authenticatedLimit;
+        this.authenticatedDurationSeconds = authenticatedDurationSeconds;
+        this.ipLimit = ipLimit;
+        this.ipDurationSeconds = ipDurationSeconds;
+        // Um bucket ocioso por mais que a janela já está cheio de novo, então descartá-lo é inócuo.
+        this.webhookBuckets = novoCache(webhookDurationSeconds);
+        this.authenticatedBuckets = novoCache(authenticatedDurationSeconds);
+        this.ipBuckets = novoCache(ipDurationSeconds);
+    }
 
-    @Value("${security.rate-limit.ip.limit:50}")
-    private int ipLimit;
+    public boolean isEnabled() {
+        return enabled;
+    }
 
-    @Value("${security.rate-limit.ip.duration:60}")
-    private int ipDurationSeconds;
+    /** Bucket de webhooks para a chave (IP de origem). */
+    public Bucket webhookBucket(String key) {
+        return webhookBuckets.get(key, k -> createNewWebhookBucket());
+    }
 
-    @Getter
-    private final Map<String, Bucket> webhookBuckets = new ConcurrentHashMap<>();
+    /** Bucket de usuário autenticado para a chave (nome do usuário). */
+    public Bucket authenticatedBucket(String key) {
+        return authenticatedBuckets.get(key, k -> createNewAuthenticatedBucket());
+    }
 
-    @Getter
-    private final Map<String, Bucket> authenticatedBuckets = new ConcurrentHashMap<>();
+    /** Bucket de requisição anônima para a chave (IP de origem). */
+    public Bucket ipBucket(String key) {
+        return ipBuckets.get(key, k -> createNewIpBucket());
+    }
 
-    @Getter
-    private final Map<String, Bucket> ipBuckets = new ConcurrentHashMap<>();
-
-    /**
-     * Cria bucket para webhooks (100 req/min).
-     */
     public Bucket createNewWebhookBucket() {
-        Bandwidth limit = Bandwidth.classic(webhookLimit,
-                Refill.intervally(webhookLimit, Duration.ofSeconds(webhookDurationSeconds)));
-        return Bucket4j.builder().addLimit(limit).build();
+        return novoBucket(webhookLimit, webhookDurationSeconds);
     }
 
-    /**
-     * Cria bucket para usuários autenticados (1000 req/min).
-     */
     public Bucket createNewAuthenticatedBucket() {
-        Bandwidth limit = Bandwidth.classic(authenticatedLimit,
-                Refill.intervally(authenticatedLimit, Duration.ofSeconds(authenticatedDurationSeconds)));
-        return Bucket4j.builder().addLimit(limit).build();
+        return novoBucket(authenticatedLimit, authenticatedDurationSeconds);
     }
 
-    /**
-     * Cria bucket por IP (50 req/min - proteção contra abuso).
-     */
     public Bucket createNewIpBucket() {
-        Bandwidth limit = Bandwidth.classic(ipLimit,
-                Refill.intervally(ipLimit, Duration.ofSeconds(ipDurationSeconds)));
-        return Bucket4j.builder().addLimit(limit).build();
+        return novoBucket(ipLimit, ipDurationSeconds);
+    }
+
+    private static Bucket novoBucket(int limit, int durationSeconds) {
+        Bandwidth bandwidth = Bandwidth.classic(limit,
+                Refill.intervally(limit, Duration.ofSeconds(durationSeconds)));
+        return Bucket4j.builder().addLimit(bandwidth).build();
+    }
+
+    private static Cache<String, Bucket> novoCache(int durationSeconds) {
+        return Caffeine.newBuilder()
+                .maximumSize(MAX_BUCKETS)
+                .expireAfterAccess(Duration.ofSeconds(durationSeconds).multipliedBy(2))
+                .build();
     }
 }

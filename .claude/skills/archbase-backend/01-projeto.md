@@ -33,7 +33,7 @@ archbase-java-boilerplate/                       # pom pai (br.com.archbase.boil
     │   ├── ArchbaseBoilerplateApplication.java  # Main class
     │   ├── infrastructure/
     │   │   ├── input/rest/                      # ProdutoController
-    │   │   ├── config/                          # QueryDslConfig, OpenAPIConfig, JacksonConfig, RateLimitingConfig...
+    │   │   ├── config/                          # QueryDslConfig, OpenAPIConfig, JacksonConfig, RateLimitingConfig...  (+ filter/RateLimitingFilter)
     │   │   ├── error/                           # RestExceptionHandler, ApiError
     │   │   └── filter/                          # TenantContextFilter, TenantAccessValidationFilter
     │   └── seed/                                # AdminSeedLoader, DataSeedLoader

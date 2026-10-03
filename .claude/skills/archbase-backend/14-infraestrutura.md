@@ -190,24 +190,32 @@ Consequência prática: o `application.yml` traz o placeholder como default, ent
 
 ---
 
-## RateLimitingConfig
+## RateLimitingConfig e RateLimitingFilter
 
-`rest.infrastructure.config.RateLimitingConfig` (`@Configuration`, Bucket4j). Expõe fábricas de
-`Bucket` (`createNewWebhookBucket()`, `createNewAuthenticatedBucket()`, `createNewIpBucket()`) e três
-`Map<String, Bucket>` (`getWebhookBuckets()`, `getAuthenticatedBuckets()`, `getIpBuckets()`).
-Limites vêm de:
+`rest.infrastructure.config.RateLimitingConfig` (`@Configuration`, Bucket4j 7.6) cria os buckets e os
+guarda em caches Caffeine (expiração e teto de 100 mil entradas, para não crescer sem limite).
+`rest.infrastructure.filter.RateLimitingFilter` (`@Order(3)`, depois do Spring Security) aplica:
+
+| Perfil | Chave | Padrão |
+|--------|-------|--------|
+| `/api/v1/webhooks/**` | IP (`getRemoteAddr()`) | 100/min |
+| autenticado | nome do usuário | 1000/min |
+| anônimo | IP (`getRemoteAddr()`) | 50/min |
+
+Excedido o limite, responde **429** com `Retry-After`. `/actuator`, `/swagger-ui` e `/v3/api-docs` não são
+limitados. Só `getRemoteAddr()` é usado, nunca `X-Forwarded-For`; atrás de proxy, configure
+`server.forward-headers-strategy`. O estado é local à instância (com N réplicas o limite efetivo é N vezes).
 
 ```yaml
 security:
   rate-limit:
+    enabled: true                                   # false desliga o filtro
     webhook:       { limit: 100,  duration: 60 }
     authenticated: { limit: 1000, duration: 60 }
     ip:            { limit: 50,   duration: 60 }    # duration em segundos
 ```
 
-Atenção: **nenhuma outra classe do projeto usa essa configuração hoje** (não há filtro/interceptor
-consumindo os buckets). É infraestrutura pronta; para limitar requisições é preciso escrever o filtro
-que chama os buckets.
+O 429 também não passa pelo `RestExceptionHandler`/`ApiError`. Coberto por `RateLimitingFilterTest`.
 
 ---
 
