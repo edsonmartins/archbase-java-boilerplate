@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -31,7 +31,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Archbase Framework -->
-        <archbase.version>3.2.2</archbase.version>
+        <archbase.version>3.4.5</archbase.version>
 
         <!-- MapStruct -->
         <org.mapstruct.version>1.6.3</org.mapstruct.version>

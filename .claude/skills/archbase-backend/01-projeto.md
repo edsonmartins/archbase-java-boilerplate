@@ -1,6 +1,6 @@
 # 01. Estrutura de Projeto
 
-Estrutura hexagonal do boilerplate: Spring Boot 4.1.0, Java 25, Archbase 3.2.2, Maven multi-módulo.
+Estrutura hexagonal do boilerplate: Spring Boot 4.1.1, Java 25, Archbase 3.4.5, Maven multi-módulo.
 O CRUD de `Produto` é a referência de código (o que o repositório faz hoje).
 
 ---
@@ -56,7 +56,7 @@ existe e compila, mas nenhuma classe do repositório o injeta além do próprio 
 <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.1.0</version>
+    <version>4.1.1</version>
     <relativePath/>
 </parent>
 
@@ -72,7 +72,7 @@ existe e compila, mas nenhuma classe do repositório o injeta além do próprio 
 
 <properties>
     <java.version>25</java.version>
-    <archbase.version>3.2.2</archbase.version>
+    <archbase.version>3.4.5</archbase.version>
     <org.mapstruct.version>1.6.3</org.mapstruct.version>
     <!-- QueryDSL: fork openfeign (Jakarta). NÃO sobrescrever querydsl.version
          (o spring-boot-dependencies usa para o querydsl-bom). -->

@@ -334,6 +334,13 @@ No lado do framework (verificado em `archbase-security` 3.2.2):
 > Não existem em `archbase-security` 3.2.2 (a classe `ArchbaseSecurityContext` não foi encontrada nos
 > jars). `hasRole`/`hasProfile` existem apenas no `SecurityService` do próprio boilerplate.
 
+**Sessão encerrada (archbase 3.4.5+).** Usuário com `allowMultipleLogins=false` tem uma sessão só:
+cada login revoga as anteriores. A sessão derrubada recebe 401 com
+`{"status":401,"error":"SESSAO_ENCERRADA","message":...}` — não o 401 genérico —, e o
+`@archbase/core` (4.13.3+) mostra "Sua sessão foi encerrada…" em vez de "Usuário/senha não
+encontrados". Quem só olha o status (refresh em 401) não muda. Não substitua o
+`CustomAuthenticationEntryPoint` sem preservar esse corpo.
+
 ---
 
 ## Primeiro administrador

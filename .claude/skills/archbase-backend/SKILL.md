@@ -7,7 +7,7 @@ description: Referência para desenvolver backend Java com Spring Boot 4 e Archb
 
 Documenta **o que o boilerplate faz hoje**, usando o CRUD de `Produto` como modelo. Quando houver dúvida, o código (`archbase-boilerplate-core` e `archbase-boilerplate-rest`) é a fonte de verdade.
 
-**Stack**: Archbase 3.2.2, Spring Boot 4.1.0, Java 25, Hibernate 7, QueryDSL (fork `io.github.openfeign.querydsl` 7.2), MapStruct 1.6.3, Lombok 1.18.46, springdoc 3.0.0.
+**Stack**: Archbase 3.4.5, Spring Boot 4.1.1, Java 25, Hibernate 7, QueryDSL (fork `io.github.openfeign.querydsl` 7.2), MapStruct 1.6.3, Lombok 1.18.46, springdoc 3.0.0.
 
 **Pacotes**: `br.com.archbase.boilerplate.core` (domínio, aplicação, persistência) e `br.com.archbase.boilerplate.rest` (controller, config, filtros, seeds).
 
@@ -84,4 +84,4 @@ Há também um `Makefile` na raiz (ver `01-projeto.md`).
 
 ---
 
-Framework: Archbase 3.2.2, Spring Boot 4.1.0, Java 25
+Framework: Archbase 3.4.5, Spring Boot 4.1.1, Java 25
